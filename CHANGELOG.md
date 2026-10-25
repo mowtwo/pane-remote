@@ -8,6 +8,10 @@ earlier work predates the public repository.
 
 ## [Unreleased]
 
+### Fixed
+- On a Mac without a monitor (screen sharing uses a virtual display) the screen view showed an empty display name. Displays without a name are now labelled with their number and resolution, e.g. "Display 1 · 1920×1080".
+- `docs/relay.md`: new step 0 for the server — a regular service user, Node at `/usr/bin/node`, and the directories the systemd unit writes to created beforehand; without them the unit fails to start.
+
 ## [0.15.4] - 2026-10-25 — Switch accounts on restart
 
 ### Added

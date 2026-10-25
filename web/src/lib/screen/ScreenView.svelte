@@ -90,7 +90,8 @@
   async function loadDisplays() {
     try {
       const { displays: ds } = await getJson<{ displays: Disp[] }>('displays')
-      displays = ds.map((d) => ({ name: d.name, x: d.x, y: d.y, w: d.w, h: d.h }))
+      // 没接显示器的 Mac（虚拟显示器）系统给的名字是空的：用序号和分辨率代替
+      displays = ds.map((d, i) => ({ name: d.name?.trim() || t('屏幕 {n} · {w}×{h}', { n: i + 1, w: d.w, h: d.h }), x: d.x, y: d.y, w: d.w, h: d.h }))
     } catch { displays = [] }
     if (selected >= displays.length) selected = 0
   }

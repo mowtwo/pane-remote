@@ -4,6 +4,7 @@ export default {
   用户名或密码不对: 'Wrong username or password',
   连接断了: 'Connection lost',
   '窗口不在当前桌面，已把它切到前台': 'The window was off screen, so it was brought forward',
+  '屏幕 {n} · {w}×{h}': 'Display {n} · {w}×{h}',
   'Mac 的屏幕': "Mac's screen",
   横过来显示: 'Show sideways',
   '触控板模式（点一下换成直接点）': 'Trackpad mode (tap for direct touch)',
