@@ -157,6 +157,15 @@ export default {
 
   // PaneSheet.svelte
   '新建': 'New',
+  '新工作区': 'New workspace',
+  '{name} · 新标签页': '{name} · New tab',
+  '拆分「{name}」（右侧）': 'Split “{name}” (right)',
+  '拆分「{name}」（下方）': 'Split “{name}” (below)',
+  '工作区': 'Workspaces',
+  '标签页': 'Tab',
+  '{n} 个 agent · {m} 个终端': '{n} agents · {m} terminals',
+  '工作区 {n}': 'Workspace {n}',
+  '{name} 操作': 'Actions for {name}',
   '窗口 {w}': 'Window {w}',
   '＋ 标签页': '+ Tab',
   '标签 {tab}': 'Tab {tab}',

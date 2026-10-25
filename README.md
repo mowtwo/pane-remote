@@ -2,19 +2,32 @@
 
 中文 | [English](README.en.md)
 
-用手机查看和操作电脑上 WezTerm 里的终端，Claude Code / Codex 会话有专门的对话视图、推送提醒和会话管理。
+用手机查看和操作电脑上 WezTerm 或 Herdr 里的终端，Claude Code / Codex 会话有专门的对话视图、推送提醒和会话管理。
 不经过任何第三方服务器：手机和电脑之间走你自己的 Tailscale 网络，只有你的账号能打开。
+
+## 终端后端和 agent
+
+**WezTerm 和 Herdr 是同一层级的终端后端，每个 pane-remote 实例选择一个，默认 WezTerm。** Codex、Claude Code 等 agent 运行在它们提供的 pane 中。
+
+| 终端后端 | 列表层级 | 接入 |
+|---|---|---|
+| WezTerm（默认） | 窗口 → 标签页 → pane | `pane-remote init --terminal wezterm` |
+| Herdr | 工作区 → 标签页 → pane → 其中运行的 agent | `pane-remote init --terminal herdr`，见 [接入说明与限制](docs/herdr.md) |
+
+列表只包含所选后端管理的 pane；其他终端里的 Codex、Codex 桌面应用的会话不会自动并入。Cursor IDE 是独立的可选模块。Herdr 列表显示 agent 类型和已注册的名称，工作区可以折叠，内部编号保留在操作详情中。
+
+打开网页时，链接指定的会话优先，其次恢复当前浏览器上次查看的会话；找不到时再选终端当前聚焦的 pane 或列表第一项。实时画面按查看的 pane 连接，但状态提醒仍会扫描所选后端全部 pane；折叠工作区只改变显示，当前还不能按工作区限制后台监控范围。
 
 ## 能做什么
 
 **基础版**（装完就有）
 
-- **一个会话列表**：WezTerm 的 pane 和（开了 Cursor 模块时）Cursor 的会话合在一起，状态统一标出（等你操作 / 做完了 / 运行中 / 有新内容）；地址就是界面状态（`#/s/p12`、`#/plugin/preview`），推送、待办都直接跳到那个地址，手机的返回手势能用
+- **一个会话列表**：所选终端的 pane 和（开了 Cursor 模块时）Cursor 的会话合在一起，状态统一标出（等你操作 / 做完了 / 运行中 / 有新内容）；地址就是界面状态（`#/s/p12`、`#/plugin/preview`），推送、待办都直接跳到那个地址，手机的返回手势能用
 - 有 agent 会话的 pane 默认打开对话视图，「原始画面」一键切回终端；每个 pane 各自记住
 - **模型和思考等级**：会话栏的模型芯片一键切换 Claude Code / Codex / cursor-agent 的模型和思考等级（只在 agent 空闲时做，见 [docs/agent.md](docs/agent.md#模型和思考等级)）
-- 所有 WezTerm pane 的实时画面，手机上直接打字、按键（键盘栏、方向摇杆、Ctrl / Shift / Option）、滑动滚动、轻点
+- 所选终端后端中 pane 的实时画面，手机上直接打字、按键（键盘栏、方向摇杆、Ctrl / Shift / Option）、滑动滚动、轻点
 - **电脑版**：在另一台电脑的浏览器里打开（宽屏 + 鼠标时自动切换）：会话列表常驻左边，终端直接用键盘打字（多行粘贴整段发送），看屏幕用真鼠标键盘；适合出门在外用笔记本连回家里的电脑。键盘、鼠标按设备认，不看窗口宽度：窗口拉窄、开了显示缩放照样能用，手机 / 平板接了键盘或鼠标、触控板也一样（全屏程序里左中右键、拖动、双指滚动都能发过去）
-- 新建标签页、拆分、关闭、重命名 pane，在电脑上切到某个 pane；电脑上把 pane 拖窄了，手机上一键调回「适合手机」的宽度（或均分整个标签页）
+- 新建标签页、拆分、关闭 pane、重命名标签页，在电脑上切到某个 pane；WezTerm 另支持调宽和均分标签页，Herdr 目前支持向右 / 向下拆分，暂不支持调宽与均分
 - Claude Code / Codex：
   - 对话视图（按会话记录排版，比终端好读）
   - **分叉会话**：带着当前会话的全部上下文在新 pane 里开一个新会话（对话栏「分叉」、pane 菜单、拆分时都能选）
@@ -48,12 +61,12 @@
 | | 说明 |
 |---|---|
 | 电脑 | macOS（Apple 芯片或 Intel） |
-| 终端 | [WezTerm](https://wezfurlong.org/wezterm/)，安装脚本会装；手机上看到的就是 WezTerm 里的 pane |
+| 终端 | 默认 [WezTerm](https://wezfurlong.org/wezterm/)（安装脚本会装），也可选用 [Herdr](docs/herdr.md) |
 | 网络 | [Tailscale](https://tailscale.com)，电脑和手机登录同一个账号。tailnet 要打开 **MagicDNS** 和 **HTTPS Certificates**（管理后台 → DNS）。自建的 Headscale 一般签不了 HTTPS 证书，用不了 |
 | 手机 / 另一台电脑 | iPhone（iOS 16.4 以上才有推送）或 Android，装 Tailscale App；也可以是另一台电脑的浏览器（装 Tailscale） |
 | 可选 | Claude Code、Codex（对话视图、分叉等功能）；Chrome（预览浏览器）；Cursor（Cursor 模块）；Xcode 命令行工具（看屏幕模块） |
 
-安装脚本用 [Homebrew](https://brew.sh) 装 WezTerm 和 Tailscale；Node.js 用电脑上已有的（20 以上），没有就从 nodejs.org 下载官方版本并校验，只给 pane-remote 自己用。
+默认安装脚本用 [Homebrew](https://brew.sh) 装 WezTerm 和 Tailscale；Herdr 用户先安装 Herdr、Tailscale，再使用下方的 `--no-brew --terminal herdr`。Node.js 用电脑上已有的（20 以上），没有就从 nodejs.org 下载官方版本并校验，只给 pane-remote 自己用。
 
 ## 安装
 
@@ -77,7 +90,8 @@ cd ~/pane-remote
 ./install.sh --yes                       # 全用默认选项
 ./install.sh --chrome                    # 没装 Chrome 又想用预览浏览器：用 Homebrew 装 Google Chrome
 ./install.sh --login you@example.com     # 允许访问的 Tailscale 账号（默认是电脑登录的账号；电脑是标签设备时必须指定）
-./install.sh --no-brew                   # 自己装好 WezTerm、Tailscale，不用 Homebrew
+./install.sh --no-brew                   # 自己装好所选终端后端、Tailscale，不用 Homebrew
+./install.sh --no-brew --terminal herdr  # 使用已安装的 Herdr；默认连接本机默认会话
 ./install.sh --lang en                   # 命令行用英文（默认按系统语言）
 ```
 
@@ -120,6 +134,8 @@ pane-remote update --rollback  # 回到上一次更新之前的版本
 
 | 键 | 含义 |
 |---|---|
+| `terminalBackend` | 终端后端，默认 `wezterm`，也可选 `herdr`（见 [配置说明](docs/herdr.md)） |
+| `paths.herdrSocket` | Herdr 会话的绝对 socket 路径 |
 | `allowedLogins` | 允许访问的 Tailscale 登录名 |
 | `serveHosts` | tailscale serve 的主机名（init 自动填） |
 | `port` | 本机服务端口，默认 8787 |
@@ -160,7 +176,7 @@ server/             服务端（手机网页的后端）
 host/               pane-host：电脑上的常驻服务（对话 / 事件推送、AI 提供方、插件的电脑端能力）
 platform/           插件平台 core（权限、审计、能力表）
 plugins/            插件目录（自带两个示例：hello、ai-demo）
-agent/              电脑这边的脚本：bridge（操作 WezTerm 的唯一入口）、hook、会话记录解析、预览浏览器、Cursor 适配、看屏幕（screen/）、这台电脑（mac/）、agent 插件（plugin/、pane-agent）
+agent/              电脑这边的脚本：bridge（操作终端的统一入口）、hook、会话记录解析、预览浏览器、Cursor 适配、看屏幕（screen/）、这台电脑（mac/）、agent 插件（plugin/、pane-agent）
 web/                手机网页源码（Svelte），构建产物在 public/
 relay/              中转模式的辅助命令
 scripts/audit.mjs   发布前审计：查个人信息、内网地址和密钥

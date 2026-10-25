@@ -17,5 +17,5 @@ export async function paneSession(pane: number | string): Promise<PaneSession> {
 export const canFork = (s: PaneSession) => !!s?.session && s.agent !== 'cursor-agent'
 
 export async function forkPane(pane: number | string, where: Where) {
-  return manage<{ pane: number }>('claude', { pane: Number(pane), mode: 'fork', where, inject: prefs.inject })
+  return manage<{ pane: number | string }>('claude', { pane: pane, mode: 'fork', where, inject: prefs.inject })
 }

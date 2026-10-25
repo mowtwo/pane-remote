@@ -16,6 +16,8 @@ const BENV = bridgeEnv()
 const WEZTERM = [BENV.WEZTERM, '/opt/homebrew/bin/wezterm', '/usr/local/bin/wezterm', '/Applications/WezTerm.app/Contents/MacOS/wezterm'].find((f) => f && fs.existsSync(f)) || 'wezterm'
 // 只在配置了持久化 mux 时才连它（和 bridge 一样）
 const MUX_SOCK = BENV.MUX_SOCK || ''
+const HERDR = BENV.TERMINAL_BACKEND === 'herdr'
+const BRIDGE = path.join(REPO, 'agent/bridge')
 const TRANSCRIPT = process.env.PANE_HOST_TRANSCRIPT || path.join(REPO, 'agent/pane-transcript')
 
 function run(file, args, { env, timeout = 10000, maxBuffer = 16 << 20 } = {}) {
@@ -49,17 +51,23 @@ export function createHost() {
     platform: 'macos',
     terminals: {
       async list() {
-        const raw = JSON.parse(await cli(['list', '--format', 'json']))
+        const raw = JSON.parse(HERDR
+          ? await run(BRIDGE, [], { env: { ...process.env, SSH_ORIGINAL_COMMAND: 'list' } })
+          : await cli(['list', '--format', 'json']))
         return raw.map((p) => {
           const dir = decodeURIComponent((p.cwd || '').replace(/^file:\/\/[^/]*/, ''))
           return {
-            pane: p.pane_id, tab: p.tab_id, window: p.window_id, workspace: p.workspace, title: p.title, tabTitle: p.tab_title,
+            pane: p.pane_id, terminalAgent: p.terminal_agent || null, backend: p.backend || 'wezterm', capabilities: p.capabilities || {}, tab: p.tab_id, window: p.window_id, workspace: p.workspace, title: p.title, tabTitle: p.tab_title,
             cwd: tilde(dir), dir, cols: p.size?.cols, rows: p.size?.rows, active: p.is_active,
             cursor: { x: p.cursor_x, y: p.cursor_y, visible: p.cursor_visibility === 'Visible' },
           }
         })
       },
       text(pane, { lines = 200, escapes = false } = {}) {
+        if (HERDR) {
+          if (!/^w[0-9A-HJKMNP-TV-Z]{1,13}:p[0-9A-HJKMNP-TV-Z]{1,13}$/.test(String(pane)) || !Number.isInteger(lines) || lines < 0 || lines > 99999) throw new Error('bad terminal parameters')
+          return run(BRIDGE, [], { env: { ...process.env, SSH_ORIGINAL_COMMAND: `${escapes ? 'ansi' : 'text'} ${pane} ${lines}` }, timeout: 5000 })
+        }
         return cli(['get-text', '--pane-id', String(pane), '--start-line', String(-lines), ...(escapes ? ['--escapes'] : [])], { timeout: 5000 })
       },
     },

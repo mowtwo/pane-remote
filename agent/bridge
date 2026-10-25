@@ -1,5 +1,5 @@
 #!/bin/bash
-# pane-remote 桥接：服务端操作 WezTerm 和读会话记录的唯一入口。
+# pane-remote 桥接：服务端操作所选终端后端和读会话记录的统一入口。
 # local 模式由服务端直接执行；relay 模式作为 authorized_keys 里的 forced command 运行。
 # 两种情况都只认 SSH_ORIGINAL_COMMAND 里的这几种指令：
 #   list                    列出所有 pane（JSON）
@@ -64,7 +64,11 @@ WEZTERM=/opt/homebrew/bin/wezterm
 NODE=""
 CHROME=""
 MUX_SOCK=""
-ENV_FILE=${PANE_REMOTE_BRIDGE_ENV:-$HOME/.config/pane-remote/bridge.env}
+TERMINAL_BACKEND=wezterm
+HERDR_SOCKET=""
+CONFIG_FILE=${PANE_REMOTE_CONFIG:-$HOME/.config/pane-remote/config.json}
+ENV_FILE=${PANE_REMOTE_BRIDGE_ENV:-$(dirname "$CONFIG_FILE")/bridge.env}
+export PANE_REMOTE_BRIDGE_ENV="$ENV_FILE"
 if [[ -f "$ENV_FILE" ]]; then
   while IFS='=' read -r k v; do
     case "$k" in
@@ -72,24 +76,43 @@ if [[ -f "$ENV_FILE" ]]; then
       NODE) NODE=$v ;;
       CHROME) CHROME=$v ;;
       MUX_SOCK) MUX_SOCK=$v ;;
+      TERMINAL_BACKEND) TERMINAL_BACKEND=$v ;;
+      HERDR_SOCKET) HERDR_SOCKET=$v ;;
     esac
   done < "$ENV_FILE"
 fi
-[[ -x "$WEZTERM" ]] || { echo "error: 找不到 wezterm（${WEZTERM}），跑 pane-remote doctor 看看" >&2; exit 2; }
-# 持久化模式（可选）：pane 都在后台的 WezTerm mux server 里时直接连它，电脑上 WezTerm 窗口关了也能用。
-# 没配或连不上就连 WezTerm 窗口（GUI）。--no-auto-start：连不上就失败，绝不顺手拉起一个空 server。
-if [[ -n "$MUX_SOCK" && -S "$MUX_SOCK" ]] && WEZTERM_UNIX_SOCKET=$MUX_SOCK "$WEZTERM" cli --no-auto-start list >/dev/null 2>&1; then
-  export WEZTERM_UNIX_SOCKET=$MUX_SOCK
-  CLI=("$WEZTERM" cli --no-auto-start)
-else
-  # 退回 GUI 也要 --no-auto-start：找不到 GUI 时不带它会拉起一个空 server，抢走 mux 的 socket 路径
-  unset WEZTERM_UNIX_SOCKET
-  CLI=("$WEZTERM" cli --no-auto-start)
-fi
 read -r cmd pane arg extra <<<"${SSH_ORIGINAL_COMMAND:-}"
+case "$TERMINAL_BACKEND" in
+  herdr)
+    case "$cmd" in
+      list|text|ansi|send|cursor|watch|fg|tails|spawn|split|kill|title|focus|width|mode)
+        exec /usr/bin/python3 "$HERE/herdr_backend.py" ;;
+    esac
+    ;;
+  wezterm)
+    [[ -x "$WEZTERM" ]] || { echo "error: 找不到 wezterm（${WEZTERM}），跑 pane-remote doctor 看看" >&2; exit 2; }
+    # 持久化模式（可选）：pane 都在后台的 WezTerm mux server 里时直接连它，电脑上 WezTerm 窗口关了也能用。
+    # 没配或连不上就连 WezTerm 窗口（GUI）。--no-auto-start：连不上就失败，绝不顺手拉起一个空 server。
+    if [[ -n "$MUX_SOCK" && -S "$MUX_SOCK" ]] && WEZTERM_UNIX_SOCKET=$MUX_SOCK "$WEZTERM" cli --no-auto-start list >/dev/null 2>&1; then
+      export WEZTERM_UNIX_SOCKET=$MUX_SOCK
+      CLI=("$WEZTERM" cli --no-auto-start)
+    else
+      # 退回 GUI 也要 --no-auto-start：找不到 GUI 时不带它会拉起一个空 server，抢走 mux 的 socket 路径
+      unset WEZTERM_UNIX_SOCKET
+      CLI=("$WEZTERM" cli --no-auto-start)
+    fi
+    ;;
+  *) echo "error: unknown terminal backend" >&2; exit 2 ;;
+esac
 
 fail() { echo "error: $1" >&2; exit 2; }
-check_pane() { [[ "$pane" =~ ^[0-9]{1,6}$ ]] || fail "bad pane id"; }
+check_pane() {
+  if [[ "$TERMINAL_BACKEND" == herdr ]]; then
+    [[ "$pane" =~ ^w[0-9A-HJKMNP-TV-Z]{1,13}:p[0-9A-HJKMNP-TV-Z]{1,13}$ ]] || fail "bad pane id"
+  else
+    [[ "$pane" =~ ^[0-9]{1,6}$ ]] || fail "bad pane id"
+  fi
+}
 b64() { [[ -n "$1" && ${#1} -le 4096 && "$1" =~ ^[A-Za-z0-9+/=]+$ ]] || fail "bad base64"; printf '%s' "$1" | base64 -D; }
 check_dir() {
   [[ "$1" == /* && "$1" != *$'\n'* && -d "$1" ]] || fail "目录不存在"

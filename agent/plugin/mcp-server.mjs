@@ -12,6 +12,7 @@ import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { paneContext } from '../../lib/pane-context.mjs'
 
 const HOME = os.homedir()
 const STATE = process.env.PANE_REMOTE_STATE || path.join(HOME, '.local/state/pane-remote')
@@ -21,7 +22,9 @@ const BRIDGE = process.env.PANE_REMOTE_BRIDGE || path.join(path.dirname(fileURLT
 const MOUSE_SOCK = path.join(HOME, '.cache/pane-remote/mouse.sock') // 看屏幕模块的鼠标助手
 const HOST_SOCK = process.env.PANE_HOST_SOCK || path.join(HOME, '.cache/pane-remote-host/host.sock')
 let paneErr = '' // 认 pane 失败的原因（写进启动日志）
-const PANE = /^\d+$/.test(process.env.WEZTERM_PANE || '') ? Number(process.env.WEZTERM_PANE) : paneFromTty()
+// A diagnostic child must not identify as its parent pane or replace its live marker.
+const context = process.env.PANE_REMOTE_AGENT === 'canary' ? { pane: null, allowTty: false } : paneContext()
+const PANE = context.pane ?? (context.allowTty ? paneFromTty() : null)
 const AGENT = process.env.PANE_REMOTE_AGENT || 'claude'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // 正常的拒绝（参数不对、没有这个 pane）：照常回给 agent，不算问题；别的出错会自动记成问题报告
@@ -34,7 +37,7 @@ function bridge(cmd, input) {
   if (r.status !== 0) throw new Error((r.stdout || r.stderr || `bridge ${cmd.split(' ')[0]} failed`).trim().slice(0, 300))
   return r.stdout
 }
-// 有的 agent（cursor-agent）启动 MCP 时不传 WEZTERM_PANE：沿父进程往上找到有终端的那个，按 tty 对上 WezTerm 的 pane
+// 有的 agent（cursor-agent）启动 MCP 时不传 WEZTERM_PANE：沿父进程往上找到有终端的那个，按 tty 对上所选终端后端的 pane
 function paneFromTty() {
   try {
     let pid = process.ppid
@@ -188,6 +191,7 @@ async function callPluginTool(name, args) {
   }
 }
 
+const PANE_SCHEMA = { anyOf: [{ type: 'integer', minimum: 0, maximum: 999999 }, { type: 'string', pattern: '^w[0-9A-HJKMNP-TV-Z]{1,13}:p[0-9A-HJKMNP-TV-Z]{1,13}(?![\\s\\S])' }] }
 const S = (props, required = []) => ({ type: 'object', properties: props, required, additionalProperties: false })
 const TOOLS = {
   user_whereabouts: {
@@ -234,13 +238,13 @@ const TOOLS = {
     run: async ({ reason }) => (await confirm(`锁定 Mac 屏幕？\n原因：${clip(reason, 200)}`)) ? lockMac() : 'user declined or did not answer; not locked',
   },
   list_panes: {
-    description: 'List the WezTerm panes pane-remote can see (pane id, title, cwd). `self: true` is your own pane.',
+    description: 'List the panes in pane-remote’s selected terminal backend (pane id, title, cwd). `self: true` is your own pane.',
     inputSchema: S({}),
     run: () => panes(),
   },
   read_pane: {
     description: "Read the last lines of another pane's screen/scrollback as plain text.",
-    inputSchema: S({ pane: { type: 'integer', minimum: 0 }, lines: { type: 'integer', minimum: 1, maximum: 2000, description: 'default 80' } }, ['pane']),
+    inputSchema: S({ pane: PANE_SCHEMA, lines: { type: 'integer', minimum: 1, maximum: 2000, description: 'default 80' } }, ['pane']),
     run: ({ pane, lines }) => {
       if (!panes().some((p) => p.pane === pane)) throw new UserError('no such pane')
       return bridge(`text ${pane} ${lines || 80}`).replace(/\n{3,}/g, '\n\n').trimEnd()
@@ -248,7 +252,7 @@ const TOOLS = {
   },
   send_to_pane: {
     description: "Type text into another pane (e.g. reply to another agent, run a command in a dev-server pane). Asks the user to confirm on the phone first. Not allowed for your own pane.",
-    inputSchema: S({ pane: { type: 'integer', minimum: 0 }, text: { type: 'string', maxLength: 4000 }, enter: { type: 'boolean', description: 'press Enter after the text (default true)' } }, ['pane', 'text']),
+    inputSchema: S({ pane: PANE_SCHEMA, text: { type: 'string', maxLength: 4000 }, enter: { type: 'boolean', description: 'press Enter after the text (default true)' } }, ['pane', 'text']),
     run: async ({ pane, text, enter }) => {
       const p = panes().find((x) => x.pane === pane)
       if (!p) throw new UserError('no such pane')
@@ -310,7 +314,7 @@ async function handle(m) {
         protocolVersion: m.params?.protocolVersion || '2025-06-18',
         capabilities: { tools: { listChanged: true } },
         serverInfo: { name: 'pane-remote', version: '1.0.0' },
-        instructions: `You are running inside pane-remote: the user controls this terminal (WezTerm pane ${PANE ?? '?'}) from their phone. These tools reach the phone and this Mac.`
+        instructions: `You are running inside pane-remote: the user controls this terminal (pane ${PANE ?? '?'}) from their phone. These tools reach the phone and this Mac.`
           + ' Tools named plugin_<id>_<tool> come from pane-remote plugins the user installed; plugin_todo_* is the user\'s todo list shared by all their agents and shown on their phone: add items the user should see or act on later (unfinished follow-ups, decisions waiting for them), and check it when they ask what is pending. plugin_todo_list returns only your own items by default; pass project: "all" only when the user explicitly asks about everything. "Your tasks" / "what\'s left" without mentioning todo means your own session task list, not the todo list.',
       } })
     }

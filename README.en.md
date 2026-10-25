@@ -2,21 +2,34 @@
 
 [中文](README.md) | English
 
-View and control the terminals in WezTerm on your Mac from your phone. Claude Code / Codex sessions get a dedicated chat view, push notifications and session management.
+View and control the terminals in WezTerm or Herdr on your Mac from your phone. Claude Code / Codex sessions get a dedicated chat view, push notifications and session management.
 No third-party server is involved: phone and Mac talk over your own Tailscale network, and only your account can open it.
 
 > The phone UI is in Chinese or English (follows the phone's language; switch in the ⋯ menu). Some labels below are quoted in Chinese with an English gloss.
+
+## Terminal backends and agents
+
+**WezTerm and Herdr are alternative terminal backends. Each pane-remote instance selects one, with WezTerm as the default.** Agents such as Codex and Claude Code run inside the panes they provide.
+
+| Backend | List hierarchy | Setup |
+|---|---|---|
+| WezTerm (default) | Window → tab → pane | `pane-remote init --terminal wezterm` |
+| Herdr | Workspace → tab → pane → its running agent | `pane-remote init --terminal herdr`; see [setup and limitations](docs/en/herdr.md) |
+
+The list includes panes managed by the selected backend. Codex in other terminals and Codex desktop conversations are not automatically merged. Cursor IDE is a separate optional module. The Herdr list shows agent types and registered names; workspaces can collapse, and internal IDs remain in the action details.
+
+Opening the page prioritizes a session specified in the URL, then the session last viewed in this browser, then the terminal's focused pane or the first available pane. Live output follows the viewed pane, but background status monitoring still scans all panes in the selected backend. Collapsing a workspace only affects presentation; per-workspace monitoring scope is not yet configurable.
 
 ## Features
 
 **Basic** (available right after install)
 
-- **One session list**: WezTerm panes and (with the Cursor module) Cursor sessions in one list with the same status marks (waiting for you / done / running / new content); the address is the UI state (`#/s/p12`, `#/plugin/preview`), so pushes and the inbox jump straight there and the phone's back gesture works
+- **One session list**: Panes from the selected terminal and (with the Cursor module) Cursor sessions in one list with the same status marks (waiting for you / done / running / new content); the address is the UI state (`#/s/p12`, `#/plugin/preview`), so pushes and the inbox jump straight there and the phone's back gesture works
 - Panes with an agent session open in the chat view by default; 「原始画面」 (Raw screen) switches back to the terminal, remembered per pane
 - **Model and reasoning effort**: the model chip in the session bar switches the model and effort of Claude Code / Codex / cursor-agent in one tap (only while the agent is idle; see [docs/en/agent.md](docs/en/agent.md#model-and-reasoning-effort))
-- Live view of every WezTerm pane; type and send keys from the phone (key bar, arrow joystick, Ctrl / Shift / Option), swipe to scroll, tap
+- Live view of panes in the selected terminal backend; type and send keys from the phone (key bar, arrow joystick, Ctrl / Shift / Option), swipe to scroll, tap
 - **Desktop layout**: open it in a browser on another computer (switches automatically on a wide screen with a mouse): the session list stays on the left, the terminal takes the keyboard directly (multi-line paste arrives as one block), and screen view uses the real mouse and keyboard. Handy for reaching your home computer from a laptop while travelling. Keyboard and mouse follow the device, not the window width: a narrow window or display scaling still works, and so does a phone or tablet with a keyboard, mouse or trackpad attached (full-screen programs get left / middle / right buttons, dragging and two-finger scrolling)
-- New tab, split, close and rename panes; focus a pane on the Mac; if a pane got dragged narrow on the Mac, widen it to fit your phone in one tap (or equalize the whole tab)
+- Create tabs, split or close panes, rename tabs, and focus a pane on the Mac. WezTerm also supports width adjustment and equalizing a tab; Herdr currently supports right / down splits but not width adjustment or equalizing
 - Claude Code / Codex:
   - Chat view (laid out from the session transcript, easier to read than the raw terminal)
   - **Fork session**: start a new session in a new pane with the full context of the current one (from the chat bar's 「分叉」 (Fork), the pane menu, or when splitting)
@@ -50,12 +63,12 @@ No third-party server is involved: phone and Mac talk over your own Tailscale ne
 | | |
 |---|---|
 | Computer | macOS (Apple silicon or Intel) |
-| Terminal | [WezTerm](https://wezfurlong.org/wezterm/), installed by the script; the phone shows WezTerm's panes |
+| Terminal | [WezTerm](https://wezfurlong.org/wezterm/) by default (installed by the script), or [Herdr](docs/en/herdr.md) |
 | Network | [Tailscale](https://tailscale.com), with Mac and phone signed in to the same account. Enable **MagicDNS** and **HTTPS Certificates** for the tailnet (admin console → DNS). Self-hosted Headscale usually can't issue HTTPS certificates and won't work |
 | Phone / another computer | iPhone (iOS 16.4+ for push) or Android, with the Tailscale app; or a browser on another computer (with Tailscale) |
 | Optional | Claude Code, Codex (chat view, fork, etc.); Chrome (preview browser); Cursor (Cursor module); Xcode command line tools (screen module) |
 
-The install script uses [Homebrew](https://brew.sh) for WezTerm and Tailscale. Node.js: the existing one (20+) is used; if there is none, the official build is downloaded from nodejs.org, checksum-verified, and used only by pane-remote.
+The default install script uses [Homebrew](https://brew.sh) for WezTerm and Tailscale. For Herdr, install Herdr and Tailscale yourself, then use `--no-brew --terminal herdr` as shown below. Node.js: the existing one (20+) is used; if there is none, the official build is downloaded from nodejs.org, checksum-verified, and used only by pane-remote.
 
 ## Install
 
@@ -79,7 +92,8 @@ Common options:
 ./install.sh --yes                       # accept all defaults
 ./install.sh --chrome                    # no Chrome but want the preview browser: install Google Chrome via Homebrew
 ./install.sh --login you@example.com     # Tailscale account allowed to access (defaults to the Mac's account; required if the Mac is a tagged device)
-./install.sh --no-brew                   # install WezTerm and Tailscale yourself, don't use Homebrew
+./install.sh --no-brew                   # install your selected terminal backend and Tailscale yourself
+./install.sh --no-brew --terminal herdr  # use an installed Herdr and its default local session
 ./install.sh --lang en                   # command-line output in English (defaults to the system language)
 ```
 
@@ -164,7 +178,7 @@ server/             server (backend for the phone UI)
 host/               pane-host: resident service on the Mac (pushed chat / events, AI providers, plugins' Mac-side capabilities)
 platform/           plugin platform core (permissions, audit, capability table)
 plugins/            plugin folder (two samples: hello, ai-demo)
-agent/              Mac-side scripts: bridge (the only entry to WezTerm), hooks, transcript parsing, preview browser, Cursor adapter, screen view (screen/), This Mac (mac/), agent plugin (plugin/, pane-agent)
+agent/              Mac-side scripts: bridge (the shared terminal entry point), hooks, transcript parsing, preview browser, Cursor adapter, screen view (screen/), This Mac (mac/), agent plugin (plugin/, pane-agent)
 web/                phone UI source (Svelte); build output goes to public/
 relay/              helper commands for relay mode
 scripts/audit.mjs   pre-release audit: personal info, internal addresses and secrets

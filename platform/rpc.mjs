@@ -164,7 +164,7 @@ export const CAPS = {
       const text = str(args?.text, 8000).trim()
       if (!text) throw bad('要发的文字不能为空')
       const list = await sessionsOf(deps).list()
-      const s = (args?.session && list.find((x) => x.session === args.session)) || (args?.pane != null && !args?.session ? list.find((x) => x.pane === Number(args.pane)) : null)
+      const s = (args?.session && list.find((x) => x.session === args.session)) || (args?.pane != null && !args?.session ? list.find((x) => String(x.pane) === String(args.pane)) : null)
       if (!s) throw Object.assign(new Error(args?.session ? '这个会话现在没在任何 pane 里运行' : '没有这个 agent 会话'), { code: 'ENOSESSION' })
       if (ctx.test) return { pane: s.pane, agent: s.agent, session: s.session, test: true }
       await sessionsOf(deps).send(s.pane, text)

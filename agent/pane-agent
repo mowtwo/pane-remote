@@ -17,6 +17,7 @@
   - 起来以后发一条 [pane-remote restore]，让 agent 按快照恢复：只读的自己重建，会改东西的先问你
 """
 import base64, glob, importlib.machinery, importlib.util, json, os, re, shlex, subprocess, sys, time
+from herdr_backend import Herdr, enabled, valid_pane, pane_value
 
 HOME = os.path.expanduser("~")
 STATE = os.path.join(HOME, ".local/state/pane-remote/agent")
@@ -42,6 +43,17 @@ _loader.exec_module(pt)
 
 
 def cli(*args, input=None):
+    if enabled():
+        h = Herdr()
+        if args[0] == "list":
+            return json.dumps(h.list())
+        pane = args[args.index("--pane-id") + 1]
+        if args[0] == "get-text":
+            return h.read(pane)
+        if args[0] == "send-text":
+            h.send(pane, input or "")
+            return ""
+        raise RuntimeError("unsupported Herdr operation")
     env = dict(os.environ)
     if MUX_SOCK and os.path.exists(MUX_SOCK):
         env["WEZTERM_UNIX_SOCKET"] = MUX_SOCK
@@ -164,7 +176,7 @@ def live_injected(pane, pid):
 def inspect(pane):
     procs, cwd = pt.fg_procs(pane)
     agent = pt.agent_of(procs)
-    out = {"pane": int(pane), "agent": agent, "shellCwd": cwd}
+    out = {"pane": pane_value(pane), "agent": agent, "shellCwd": cwd}
     if agent == "claude":
         pid, info, conf = claude_proc(procs)
         if not info:
@@ -261,7 +273,7 @@ def snapshot(pane, info=None):
     info = info or inspect(pane)
     if info.get("agent") not in AGENTS or not info.get("session"):
         raise RuntimeError("这个 pane 里没有认得的 agent 会话（Claude / Codex / cursor-agent）")
-    snap = {"t": time.time(), "pane": int(pane), "agent": info["agent"], **{k: info[k] for k in ("session", "cwd", "configDir", "flags", "status")},
+    snap = {"t": time.time(), "pane": pane_value(pane), "agent": info["agent"], **{k: info[k] for k in ("session", "cwd", "configDir", "flags", "status")},
             "transcript": "", "background": [], "crons": [], "tasks": []}
     if info["agent"] == "claude":
         # Codex、cursor-agent 没有 Claude 这样的后台任务 / 定时任务 / task，只记会话本身
@@ -672,7 +684,7 @@ def triage_tokens():
 
 def agent_env():
     path = os.pathsep.join([os.path.join(HOME, ".local/bin"), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"])
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_CODE_", "CLAUDECODE", "WEZTERM_PANE", "PANE_REMOTE_INCIDENT"))}
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_CODE_", "CLAUDECODE", "WEZTERM_PANE", "HERDR_", "PANE_REMOTE_INCIDENT"))}
     return {**env, "PATH": path, **triage_tokens()}
 
 
@@ -1305,7 +1317,7 @@ def main():
         return print(json.dumps(available()))
     if cmd == "locate":
         return print(json.dumps(locate(pane)))
-    if not pane.isdigit():
+    if not valid_pane(pane):
         sys.exit("bad pane")
     if cmd == "inspect":
         print(json.dumps(inspect(pane), ensure_ascii=False))

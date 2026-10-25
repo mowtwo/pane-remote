@@ -9,7 +9,7 @@ export const HOME = os.homedir()
 export const STATE = process.env.PANE_REMOTE_STATE || path.join(HOME, '.local/state/pane-remote')
 export const TRIAGE_ENV = path.join(HOME, '.config/pane-remote/triage-env')
 const TOKEN_KEYS = ['CLAUDE_CODE_OAUTH_TOKEN', 'CURSOR_API_KEY']
-const DROP = /^(CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|WEZTERM_PANE$|PANE_REMOTE_INCIDENT$|PANE_REMOTE_AGENT$|CODEX_THREAD_ID$|CURSOR_AGENT$|CURSOR_INVOKED_AS$)/
+const DROP = /^(CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|WEZTERM_PANE$|HERDR_|PANE_REMOTE_INCIDENT$|PANE_REMOTE_AGENT$|CODEX_THREAD_ID$|CURSOR_AGENT$|CURSOR_INVOKED_AS$)/
 
 export function triageTokens(file = TRIAGE_ENV) {
   const out = {}

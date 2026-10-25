@@ -1,11 +1,12 @@
 #!/usr/bin/python3
-"""pane-remote 用的 hook：把「回合结束 / 需要你操作」连同 WezTerm pane 编号记到本地，
+"""pane-remote 用的 hook：把「回合结束 / 需要你操作」连同所选终端后端的 pane ID记到本地，
 服务端扫描时经 bridge 的 events 命令读走，用来推送和显示状态。不联网，永远 exit 0。
 
 用法（hook 配置里）：pane-event <stop|notify|failure|permission|prompt|session> [--agent claude|codex]
   session：SessionStart 时调，只记下这个 pane 的会话信息
 """
 import json, os, sys, time
+from herdr_backend import current_pane, pane_value
 
 LOG = os.path.expanduser("~/.local/state/pane-remote/events.jsonl")
 # 每个 pane 当前的 Claude / Codex 会话（会话 ID、记录文件、账号目录），给手机端的「分叉会话」「对话视图」用
@@ -16,9 +17,9 @@ MAX = 512 * 1024  # 超过就截掉前一半，文件不会无限长
 def main():
     kind = sys.argv[1] if len(sys.argv) > 1 else "event"
     agent = sys.argv[sys.argv.index("--agent") + 1] if "--agent" in sys.argv else "claude"
-    pane = os.environ.get("WEZTERM_PANE", "")
-    if not pane.isdigit():
-        return  # 不在 WezTerm 里跑的会话，手机端管不到
+    pane = current_pane()
+    if not pane:
+        return  # 不在受支持的终端里跑的会话，手机端管不到
     try:
         hook = json.load(sys.stdin)
     except Exception:
@@ -40,7 +41,7 @@ def main():
         os.replace(PANES + ".tmp", PANES)
     if kind == "session":
         return  # 只为记会话信息，不算事件
-    rec = {"t": time.time(), "pane": int(pane), "agent": agent, "kind": kind,
+    rec = {"t": time.time(), "pane": pane_value(pane), "agent": agent, "kind": kind,
            "msg": " ".join(msg.split())[:200], "cwd": hook.get("cwd") or os.getcwd()}
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
     try:

@@ -74,8 +74,8 @@ export const mouseMode = () => ui.alt && !!ui.fg && !SHELLS.has(ui.fg)
 export const currentPane = () => ui.panes.find((p) => String(p.pane) === ui.current)
 export const paneName = () => {
   const p = currentPane()
-  if (ui.title) return `#${ui.current} ${ui.title}`
-  return p ? `#${p.pane} ${label(p)}` : ui.current ? `#${ui.current}` : t('选择 pane')
+  if (ui.title) return ui.title
+  return p ? label(p) : ui.current ? t('终端') : t('选择 pane')
 }
 
 export let lines: string[] = []
@@ -219,7 +219,7 @@ export async function reconnectPane() {
   seq = '' // 不带帧序号：服务端一定发整屏
   let mac = ''
   try {
-    const r = await fetch('api/reconnect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pane: Number(pane) }), signal: AbortSignal.timeout(15000) })
+    const r = await fetch('api/reconnect', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pane: pane }), signal: AbortSignal.timeout(15000) })
     mac = (await r.json().catch(() => ({}))).mac || ''
   } catch (e) { mac = (e as Error).message }
   if (ui.current !== pane) return { dropped, mac }

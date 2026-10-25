@@ -8,6 +8,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { isPaneId, terminalId } from '../lib/terminal-id.mjs'
 import { fork } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -77,7 +78,7 @@ export function createToolHost(deps) {
     const m = deps.catalog.get(hit.plugin)
     const t0 = Date.now()
     const audit = (result, error) => deps.audit.record({ plugin: m.id, method: `mcp.${hit.tool}`, result, impl: 'tools', ms: Date.now() - t0, ...(error ? { error } : {}) })
-    const who = caller && typeof caller === 'object' ? { agent: str(caller.agent, 40) || null, pane: Number.isInteger(caller.pane) ? caller.pane : null, cwd: str(caller.cwd, 1000) || null, session: /^[\w-]{8,80}$/.test(String(caller.session || '')) ? String(caller.session) : null } : null
+    const who = caller && typeof caller === 'object' ? { agent: str(caller.agent, 40) || null, pane: isPaneId(caller.pane) ? terminalId(caller.pane) : null, cwd: str(caller.cwd, 1000) || null, session: /^[\w-]{8,80}$/.test(String(caller.session || '')) ? String(caller.session) : null } : null
     try {
       await deps.perms.permit({ client: 'agent', test: false, visible: () => false, prompt: askPrompt(m, who, hit.tool) }, m, 'mcp')
     } catch (e) {

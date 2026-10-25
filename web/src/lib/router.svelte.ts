@@ -16,7 +16,7 @@ export function parse(hash: string): Route {
   const sp = new URLSearchParams(q < 0 ? '' : h.slice(q + 1))
   let view: View = NONE
   let m: RegExpMatchArray | null
-  if ((m = path.match(/^\/s\/p(\d+)$/))) view = { kind: 'pane', pane: m[1] }
+  if ((m = path.match(/^\/s\/p(\d{1,6}|w[0-9A-HJKMNP-TV-Z]{1,13}:p[0-9A-HJKMNP-TV-Z]{1,13})$/))) view = { kind: 'pane', pane: m[1] }
   else if ((m = path.match(/^\/s\/c:([^/]*)$/))) view = { kind: 'cursor', id: decodeURIComponent(m[1]) }
   else if ((m = path.match(/^\/plugin\/([\w.-]+)$/))) view = { kind: 'plugin', id: m[1] }
   return { view, sheet: sp.get('sheet') || '', open: sp.get('open') || '' }
@@ -41,7 +41,7 @@ function legacy(): Route | null {
   if (incident && /^[0-9a-f]{12}$/.test(incident)) return { view: NONE, sheet: `incident:${incident}`, open: '' }
   if (cursor && /^[0-9a-f-]{8,64}$/i.test(cursor)) return { view: { kind: 'cursor', id: cursor }, sheet: '', open: '' }
   if (preview) return { view: { kind: 'plugin', id: 'preview' }, sheet: '', open: preview }
-  if (pane && /^\d+$/.test(pane)) return { view: { kind: 'pane', pane }, sheet: '', open: '' }
+  if (pane && /^(?:\d{1,6}|w[0-9A-HJKMNP-TV-Z]{1,13}:p[0-9A-HJKMNP-TV-Z]{1,13})$/.test(pane)) return { view: { kind: 'pane', pane }, sheet: '', open: '' }
   return null
 }
 

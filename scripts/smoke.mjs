@@ -70,6 +70,18 @@ try {
   const sockets = [] // 页面开的 WebSocket
   const requests = [] // 页面发的请求
   const sends = [] // 发进 pane 的内容（/api/send 的请求体）
+  const herdrPanes = [
+    ['wA:pB', 'wA:t1', 'wA', 'project-alpha', '迭代进度与 PR 跟进', 'Leader'],
+    ['wA:pC', 'wA:t2', 'wA', 'project-alpha', 'shell', '2'],
+    ['wB:p1', 'wB:t1', 'wB', 'task-409', 'TASK-409 优化会话列表与操作体验', '1'],
+    ['wB:p2', 'wB:t1', 'wB', 'task-409', 'shell', '1'],
+    ['wC:p1', 'wC:t1', 'wC', 'task-495', 'shell', '1'],
+    ['wC:p2', 'wC:t1', 'wC', 'task-495', 'shell', '1'],
+  ].map(([pane, tab, window, workspace, title, tabTitle]) => ({ pane, tab, window, workspace, title, tabTitle,
+    terminalAgent: pane === 'wA:pB' ? { kind: 'codex', name: 'leader' } : pane === 'wB:p1' ? { kind: 'claude', name: 'reviewer' } : null,
+    backend: 'herdr', capabilities: { width: false }, cwd: '~/.herdr/worktrees/project-alpha/feature-session-list',
+    dir: '/tmp', cols: 120, rows: 40, active: pane === 'wA:pB' }))
+  let herdrFixture = false
   let dropChunks = false // 断网那一段：页面分块的请求一律失败
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data)
@@ -88,7 +100,7 @@ try {
     else if (m.method === 'Fetch.requestPaused') {
       // 电脑版那一段：测试中转连不上 Mac（没有 bridge），pane 列表和发送由这里假装回答
       const u = m.params.request.url
-      const body = u.includes('/api/panes') ? JSON.stringify([{ pane: 1, tab: 1, window: 1, workspace: 'default', title: 'zsh', tabTitle: '', cwd: '~', dir: '/tmp', cols: 80, rows: 24, active: true }]) : '{"ok":true}'
+      const body = u.includes('/api/panes') ? JSON.stringify(herdrFixture ? herdrPanes : [{ pane: 1, tab: 1, window: 1, workspace: 'default', title: 'zsh', tabTitle: '', cwd: '~', dir: '/tmp', cols: 80, rows: 24, active: true }]) : '{"ok":true}'
       cdp('Fetch.fulfillRequest', { requestId: m.params.requestId, responseCode: 200, responseHeaders: [{ name: 'content-type', value: 'application/json' }], body: Buffer.from(body).toString('base64') }, m.sessionId).catch(() => {})
     }
     if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id) }
@@ -173,7 +185,7 @@ try {
   await ev(C, `localStorage.setItem('termViews', JSON.stringify({ 1: 'term' }))`)
   await ev(C, 'location.reload()')
   await sleep(5000)
-  ok(await ev(C, `matchMedia('(min-width: 1024px) and (pointer: fine)').matches && /#1/.test(document.querySelector('[data-testid=session-sidebar] [data-testid=session-list]')?.innerText || '')`), '电脑版：会话列表常驻左边', await ev(C, `document.querySelector('[data-testid=session-sidebar]')?.innerText.slice(0, 200) ?? 'no sidebar'`))
+  ok(await ev(C, `matchMedia('(min-width: 1024px) and (pointer: fine)').matches && !!document.querySelector('[data-testid=session-sidebar] [data-pane-id="1"]')`), '电脑版：会话列表常驻左边', await ev(C, `document.querySelector('[data-testid=session-sidebar]')?.innerText.slice(0, 200) ?? 'no sidebar'`))
   if (process.env.SMOKE_SHOT) fs.writeFileSync(process.env.SMOKE_SHOT, Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' }, C)).data, 'base64'))
   const ta = `document.querySelector('.xterm-helper-textarea')`
   await ev(C, `${ta}?.focus()`)
@@ -201,6 +213,39 @@ try {
   ok(!(await ev(C, `!!document.querySelector('[data-testid=session-sidebar]')`)) && narrow.includes('narrow'), '窗口拉窄：侧栏收起，键盘照样打字', JSON.stringify(narrow))
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }, C)
   await sleep(1000)
+
+  // Herdr identifiers remain intact through hash routing, pane selection and input.
+  herdrFixture = true
+  await ev(C, `localStorage.setItem('termViews', JSON.stringify({ 'wA:pB': 'term' })); location.hash = '#/s/pwA:pB'`)
+  await ev(C, 'location.reload()')
+  await sleep(4000)
+  ok(await ev(C, `location.hash === '#/s/pwA:pB' && !!document.querySelector('.xterm') && !!document.querySelector('[data-testid=session-sidebar] [data-pane-id="wA:pB"]')`), 'Herdr：含字母的 pane ID 能路由到终端')
+  await ev(C, `${ta}?.focus()`)
+  const sentHerdr = sends.length
+  await cdp('Input.insertText', { text: 'herdr-input' }, C)
+  await sleep(1000)
+  const herdrSends = sends.slice(sentHerdr).map((b) => { try { return JSON.parse(b) } catch { return {} } })
+  ok(herdrSends.some((b) => b.pane === 'wA:pB' && b.data.includes('herdr-input')), 'Herdr：键盘输入保留原始 pane ID', JSON.stringify(herdrSends))
+
+  const cleanList = await ev(C, `document.querySelector('[data-testid=session-sidebar] [data-testid=session-list]')?.innerText || ''`)
+  ok(cleanList.includes('project-alpha') && cleanList.includes('shell · 1') && cleanList.includes('shell · 2') && !/w[A-Z]:[pt]|120×40/.test(cleanList), '会话列表：名称分组、同名序号，隐藏内部 ID 与尺寸', cleanList)
+  ok(await ev(C, `document.querySelector('[data-workspace-id="wA"] [data-pane-id="wA:pB"] [data-testid=agent-identity]')?.innerText.includes('Codex') && document.querySelector('[data-workspace-id="wB"] [data-pane-id="wB:p1"] [data-testid=agent-identity]')?.innerText.includes('reviewer')`), 'Herdr：工作区内显示正确的 agent 类型与名称')
+  await ev(C, `document.querySelector('[data-workspace-id="wC"] button[aria-expanded]')?.click()`)
+  ok(await ev(C, `!document.querySelector('[data-workspace-id="wC"] [data-pane-id]') && !!document.querySelector('[data-workspace-id="wA"] [data-pane-id]')`), '工作区折叠只收起本组会话')
+  await ev(C, `document.querySelector('[data-workspace-id="wC"] button[aria-expanded]')?.click()`)
+  if (process.env.SMOKE_HERDR_SHOT) fs.writeFileSync(process.env.SMOKE_HERDR_SHOT + '-desktop.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' }, C)).data, 'base64'))
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true }, C)
+  await cdp('Emulation.setTouchEmulationEnabled', { enabled: true }, C)
+  await ev(C, `location.hash = '#/s/pwA:pB?sheet=sessions'`)
+  await sleep(1500)
+  ok(await ev(C, `!!document.querySelector('[role=dialog] [data-pane-id="wA:pB"]') && document.documentElement.scrollWidth <= innerWidth`), '手机会话抽屉：显示会话且无横向溢出')
+  if (process.env.SMOKE_HERDR_SHOT) fs.writeFileSync(process.env.SMOKE_HERDR_SHOT + '-mobile.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' }, C)).data, 'base64'))
+  await ev(C, `document.querySelector('[role=dialog] [data-pane-id="wB:p2"]')?.click()`)
+  await sleep(700)
+  ok(await ev(C, `location.hash === '#/s/pwB:p2' && !document.querySelector('[role=dialog]')`), '手机会话抽屉：点击名称仍选择正确的原始 ID')
+  await ev(C, `location.hash = '#/s/pwA:pB'`)
+  await cdp('Emulation.setTouchEmulationEnabled', { enabled: false }, C)
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }, C)
 
   // 5b. 打开时网络断了：终端那一块（懒加载的分块）载入失败，网络回来后自己补上，不用重开 App，也不报问题
   await cdp('Fetch.enable', { patterns: [{ urlPattern: '*/api/panes*' }, { urlPattern: '*/api/send*' }, { urlPattern: '*/assets/c-TerminalView*' }] }, C)

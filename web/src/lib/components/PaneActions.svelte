@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as Drawer from '$lib/components/ui/drawer'
   import { toast } from 'svelte-sonner'
-  import { label, manage, type Pane } from '$lib/api'
+  import { label, terminalAgentLabel, manage, type Pane } from '$lib/api'
   import { ui, loadPanes, select } from '$lib/session.svelte'
   import { cn } from '$lib/utils'
   import { paneSession, canFork, forkPane, type PaneSession, type Where } from '$lib/claude/fork'
@@ -69,8 +69,10 @@
   <Drawer.Content>
     {#if pane}
       <Drawer.Header class="border-b py-3 text-left">
-        <Drawer.Title class="truncate">#{pane.pane}&nbsp; {label(pane)}</Drawer.Title>
-        <Drawer.Description class="truncate font-mono text-xs">{pane.cwd} · {t('窗口 {w} / 标签 {tab}', { w: pane.window, tab: pane.tab })} · {pane.cols}×{pane.rows}</Drawer.Description>
+        <Drawer.Title class="truncate">{label(pane)}</Drawer.Title>
+        {#if pane.backend === 'herdr'}<p class="text-xs text-muted-foreground">Herdr · {pane.workspace} · {terminalAgentLabel(pane)}{pane.terminalAgent?.name ? ` · ${pane.terminalAgent.name}` : ''}</p>{/if}
+        <Drawer.Description class="break-all text-xs">{pane.cwd}</Drawer.Description>
+        <p class="font-mono text-xs text-muted-foreground">ID {pane.pane} · {pane.cols}×{pane.rows}</p>
       </Drawer.Header>
       <div class="grid px-2 pt-1 pb-[calc(env(safe-area-inset-bottom)+8px)]">
         {#if canFork(session)}
@@ -86,7 +88,9 @@
         <button class={item} onclick={() => act('open')}>{t('打开')}</button>
         <button class={item} onclick={() => act('right')}>{t('向右拆分')}</button>
         <button class={item} onclick={() => act('bottom')}>{t('向下拆分')}</button>
+        {#if pane.capabilities?.width !== false}
         <button class={item} onclick={() => act('width')}>{t('调整电脑上的宽度')}<span class="ml-1.5 text-xs text-muted-foreground">{t('{n} 列', { n: pane.cols })}</span></button>
+        {/if}
         <button class={item} onclick={() => act('rename')}>{t('重命名标签页')}</button>
         <button class={item} onclick={() => act('focus')}>{t('在电脑上切到这里')}</button>
         <button class={cn(item, 'text-destructive', armed && 'bg-destructive text-white active:bg-destructive')} onclick={() => act('kill')}>

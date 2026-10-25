@@ -1,3 +1,4 @@
+import { isPaneId, isWindowId, terminalId } from '../lib/terminal-id.mjs'
 // pane-remote 服务：手机网页（PWA）的后端。只监听 127.0.0.1，由 `tailscale serve` 对 tailnet 提供 HTTPS。
 // 两种部署（见 config.mjs）：
 //   local  跑在电脑上，直接执行 agent/bridge
@@ -145,6 +146,9 @@ async function listPanes() {
   const raw = JSON.parse(await bridge('list'))
   const out = raw.map((p) => ({
     pane: p.pane_id,
+    backend: p.backend || 'wezterm',
+    terminalAgent: p.terminal_agent || null,
+    capabilities: p.capabilities || {},
     tab: p.tab_id,
     window: p.window_id,
     workspace: p.workspace,
@@ -314,7 +318,7 @@ function noteReconnect(pane, mac) {
   const t = Date.now()
   const r = [...(reconnects.get(pane) || []).filter((x) => t - x < 300000), t]
   reconnects.set(pane, r)
-  if (r.length > 8) incidents.record({ source: 'server', component: 'stream', kind: 'reconnect-storm', title: '画面流频繁重连', msg: `pane ${pane} 5 分钟内重连 ${r.length} 次（mac ${mac}）`, ctx: { pane: Number(pane) } })
+  if (r.length > 8) incidents.record({ source: 'server', component: 'stream', kind: 'reconnect-storm', title: '画面流频繁重连', msg: `pane ${pane} 5 分钟内重连 ${r.length} 次（mac ${mac}）`, ctx: { pane: terminalId(pane) } })
   // 手机在用、却恢复不了到电脑的连接（电脑睡着时也会这样：只按次数推，不算严重）
   if (!mac.startsWith('ok') && !mac.endsWith('→ ok')) incidents.record({ source: 'server', component: 'tunnel', kind: 'reconnect-failed', title: '到电脑的连接恢复不了', msg: `reconnect: mac ${mac}` })
 }
@@ -359,7 +363,7 @@ function agentCommand(info, mode) {
   }
 }
 const b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64')
-const isId = (v) => /^\d{1,6}$/.test(String(v))
+const isId = isPaneId
 const isSessionId = (v) => typeof v === 'string' && /^[0-9a-zA-Z-]{8,64}$/.test(v)
 const isDir = (v) => typeof v === 'string' && v.startsWith('/') && v.length <= 1024 && !/[\r\n]/.test(v)
 const dirSessions = async (dir) => JSON.parse((await bridge(`sessions ${b64(dir)}`)) || '[]')
@@ -392,7 +396,7 @@ async function manage(action, b) {
     if (/(^|[\s/])claude(-[\w-]+)?(\s|$)/.test(cmd) && !cmd.includes(WITH_TOOLS)) cmd = `unset CLAUDE_CODE_CHILD_SESSION; ${cmd}`
     let out
     if (action === 'spawn') {
-      if (b.window !== 'new' && !isId(b.window)) throw new Error('bad window')
+      if (b.window !== 'new' && !isWindowId(b.window)) throw new Error('bad window')
       out = await bridge(`spawn ${b.window} ${b64(b.dir)}`)
     } else {
       if (!isId(b.pane) || !['right', 'bottom', 'left', 'top'].includes(b.direction)) throw new Error('bad split')
@@ -408,7 +412,7 @@ async function manage(action, b) {
       await sleepMs(60)
       await bridge(`send ${pane} ${b64('\r')}`)
     }
-    return { pane: Number(pane) }
+    return { pane: terminalId(pane) }
   }
   if (action === 'claude') {
     // 分叉当前会话（带着上下文开新会话）/ 同目录新开。各 agent 的命令不同；Claude 要用同一个账号的 wrapper 才找得到会话
@@ -905,7 +909,7 @@ async function onRequest(req, res) {
     }
     if (url.pathname === '/api/stream' && req.method === 'GET') {
       const pane = url.searchParams.get('pane')
-      if (!/^\d{1,6}$/.test(pane || '')) return json(res, 400, { error: 'bad pane' })
+      if (!isPaneId(pane)) return json(res, 400, { error: 'bad pane' })
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', 'x-accel-buffering': 'no' })
       // 重连间隔带点随机，几台设备不会同时砸过来
       res.write(`retry: ${1500 + Math.floor(Math.random() * 1500)}\n\n`)
@@ -921,7 +925,7 @@ async function onRequest(req, res) {
       const origin = req.headers.origin
       if (origin && new URL(origin).host !== req.headers.host) return json(res, 403, { error: 'bad origin' })
       const { pane, data, rid } = JSON.parse(await readBody(req))
-      if (!/^\d{1,6}$/.test(String(pane)) || typeof data !== 'string' || !data) return json(res, 400, { error: 'bad request' })
+      if (!isPaneId(pane) || typeof data !== 'string' || !data) return json(res, 400, { error: 'bad request' })
       // 手机网络抖动时会带同一个 rid 重发：已经收到过的不再发进 pane，等第一次的结果
       const key = typeof rid === 'string' && /^[\w-]{8,40}$/.test(rid) ? rid : null
       if (key && sentRids.has(key)) { await sentRids.get(key).p.catch(() => {}); return json(res, 200, { ok: true, dup: true }) }
@@ -940,29 +944,29 @@ async function onRequest(req, res) {
     }
     if (url.pathname === '/api/claude' && req.method === 'GET') {
       const pane = url.searchParams.get('pane')
-      if (!/^\d{1,6}$/.test(pane || '')) return json(res, 400, { error: 'bad pane' })
+      if (!isPaneId(pane)) return json(res, 400, { error: 'bad pane' })
       return json(res, 200, JSON.parse((await bridge(`session ${pane}`)) || '{}'))
     }
     if (url.pathname === '/api/transcript' && req.method === 'GET') {
       const pane = url.searchParams.get('pane')
       const n = Math.min(200, Number(url.searchParams.get('n')) || 60)
-      if (!/^\d{1,6}$/.test(pane || '')) return json(res, 400, { error: 'bad pane' })
+      if (!isPaneId(pane)) return json(res, 400, { error: 'bad pane' })
       return sendTranscript(req, res, await transcript(pane, n))
     }
     if (url.pathname === '/api/transcript/stream' && req.method === 'GET') {
       const pane = url.searchParams.get('pane')
       const n = Math.min(200, Number(url.searchParams.get('n')) || 60)
-      if (!/^\d{1,6}$/.test(pane || '')) return json(res, 400, { error: 'bad pane' })
+      if (!isPaneId(pane)) return json(res, 400, { error: 'bad pane' })
       return transcriptStream(req, res, pane, n)
     }
     if (url.pathname === '/api/reconnect' && req.method === 'POST') {
       const { pane } = JSON.parse((await readBody(req, 1024)) || '{}')
-      if (!/^\d{1,6}$/.test(String(pane))) return json(res, 400, { error: 'bad pane' })
+      if (!isPaneId(pane)) return json(res, 400, { error: 'bad pane' })
       return json(res, 200, await reconnect(String(pane)))
     }
     if (url.pathname === '/api/crons' && req.method === 'GET') {
       const pane = url.searchParams.get('pane')
-      if (!/^\d{1,6}$/.test(pane || '')) return json(res, 400, { error: 'bad pane' })
+      if (!isPaneId(pane)) return json(res, 400, { error: 'bad pane' })
       return json(res, 200, await crons(pane, url.searchParams.has('fresh')))
     }
     if (url.pathname === '/api/ls' && req.method === 'GET') {
@@ -1083,7 +1087,7 @@ async function onRequest(req, res) {
         if (sev && c.queued) c.msg = `${c.msg}（手机连不上时发生，晚 ${Math.round((Number(c.late) || 0) / 1000)} 秒补报）`
         // 经本机隧道访问的（自动化测试的浏览器，Host 是 127.0.0.1 / localhost；真手机走 tailscale 不会是这个）只算测试问题，不推送
         const viaTest = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(String(req.headers.host || ''))
-        if (sev) incidents.record({ test: viaTest, source: 'phone', component: c.kind === 'send-fail' ? 'send' : c.kind === 'ui-fail' ? 'ui' : 'web', kind: c.kind, msg: String(c.msg || '').split('\n')[0], detail: String(c.msg || ''), severity: sev, ctx: { ua: String(req.headers['user-agent'] || '').slice(0, 160), ...(Number.isInteger(c.pane) ? { pane: c.pane } : {}) } })
+        if (sev) incidents.record({ test: viaTest, source: 'phone', component: c.kind === 'send-fail' ? 'send' : c.kind === 'ui-fail' ? 'ui' : 'web', kind: c.kind, msg: String(c.msg || '').split('\n')[0], detail: String(c.msg || ''), severity: sev, ctx: { ua: String(req.headers['user-agent'] || '').slice(0, 160), ...(isPaneId(c.pane) ? { pane: terminalId(c.pane) } : {}) } })
       } catch {}
       return json(res, 200, { ok: true })
     }
@@ -1145,7 +1149,7 @@ const agentNotify = { byPane: new Map(), recent: [] }
 const askId = (v) => typeof v === 'string' && /^[0-9a-f]{24}$/.test(v)
 const testPane = (pane) => { const i = push.paneInfo(pane); return !i || i.workspace === 'pane-remote-test' } // 不认识的 pane 也不推
 function onAgent(ev) {
-  const pane = Number.isInteger(ev.pane) ? String(ev.pane) : null
+  const pane = isPaneId(ev.pane) ? String(ev.pane) : null
   if (ev.op === 'cancel') { if (askId(ev.id)) asks.delete(ev.id); return }
   if (!pane) return
   if (ev.op === 'ask') {

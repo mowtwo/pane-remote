@@ -1,9 +1,12 @@
 // 和 server.mjs 的接口一一对应
 import { t, tr } from './i18n'
 export type Pane = {
-  pane: number
-  tab: number
-  window: number
+  pane: number | string
+  backend?: 'wezterm' | 'herdr'
+  terminalAgent?: { kind: string; name: string } | null
+  capabilities?: { width?: boolean }
+  tab: number | string
+  window: number | string
   workspace: string
   title: string
   tabTitle: string
@@ -31,10 +34,10 @@ export async function fetchPanes(): Promise<Pane[]> {
 export type ManageAction = 'spawn' | 'split' | 'kill' | 'title' | 'focus' | 'claude' | 'width'
 export const manage = <T = any>(action: ManageAction, body: unknown) => postJson<T>(`api/pane/${action}`, body)
 
-export type CreateTarget = { window?: number; dir?: string; split?: Pane; direction?: 'right' | 'bottom' }
+export type CreateTarget = { window?: number | string; dir?: string; split?: Pane; direction?: 'right' | 'bottom' }
 
 // 某个目录下最近的 Claude 会话（新建页面「恢复会话」用）。running：还开着；pane：开在哪个 pane（不在 WezTerm 里就没有）
-export type ClaudeSession = { id: string; title: string; t: number; branch: string; configDir: string; running: boolean; pane?: number }
+export type ClaudeSession = { id: string; title: string; t: number; branch: string; configDir: string; running: boolean; pane?: number | string }
 export async function fetchSessions(dir: string): Promise<ClaudeSession[]> {
   return parse(await fetch(`api/sessions?dir=${encodeURIComponent(dir)}`, { cache: 'no-store' }))
 }
@@ -42,7 +45,14 @@ export async function fetchSessions(dir: string): Promise<ClaudeSession[]> {
 /** 回答 agent 在手机上问的问题：answer 是选项之一；text 是自由回答（确认类问题不接受） */
 export const answerAsk = (id: string, answer: string, text = '') => postJson('api/agent/answer', { id, answer, text })
 
-export const label = (p: Pane) => p.title || p.tabTitle || `pane ${p.pane}`
+export const label = (p: Pane) => p.title || (p.tabTitle && !/^\d+$/.test(p.tabTitle) ? p.tabTitle : '') || t('终端')
+
+export const terminalAgentLabel = (p: Pane) => {
+  const kind = p.terminalAgent?.kind
+  return kind ? ({ claude: 'Claude Code', codex: 'Codex', 'cursor-agent': 'Cursor', cursor: 'Cursor' }[kind] || kind) : t('终端')
+}
+export const workspaceLabel = (p: Pane, index: number) => p.workspace && p.workspace !== 'default' && p.workspace !== String(p.window)
+  ? p.workspace : p.backend === 'herdr' ? t('工作区 {n}', { n: index + 1 }) : t('窗口 {w}', { w: p.window })
 
 // 报错 / 诊断发回服务端（pane-remote logs 里搜 client）。以前用 sendBeacon：手机连不上中转的时候发的全丢了，
 // 偏偏最想知道的就是那段时间出了什么错。现在发不出去就存在本机（最多 200 条），下次连上（启动、切回前台、网络恢复、
@@ -117,7 +127,7 @@ async function pump() {
         const r = await fetch('api/send', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ pane: Number(pane), data, rid }),
+          body: JSON.stringify({ pane: pane, data, rid }),
           signal: c.signal,
         })
         if (!r.ok) { const err = (await r.json().catch(() => ({}))).error; onError(err ? tr(err) : t('发送失败 {status}', { status: r.status })) }

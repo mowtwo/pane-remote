@@ -25,7 +25,7 @@
     if (!ui.current) return
     busy = `${mode}-${where}`
     try {
-      const { pane } = await manage<{ pane: number }>('claude', { pane: Number(ui.current), mode, where, inject: prefs.inject })
+      const { pane } = await manage<{ pane: number | string }>('claude', { pane: ui.current, mode, where, inject: prefs.inject })
       open = false
       toast(mode === 'fork' ? t('已分叉到新 pane（新会话，带着原来的上下文）') : t('已新开 {agent}', { agent: agentName() }))
       await loadPanes()
@@ -61,7 +61,7 @@
     armed = false
     const pane = ui.current
     try {
-      await postJson('api/agent/restart', { pane: Number(pane), inject: true, confirm: true })
+      await postJson('api/agent/restart', { pane: pane, inject: true, confirm: true })
       restart = { step: t('开始') }
       const poll = async () => {
         const r = await fetch(`api/agent/restart?pane=${pane}`, { cache: 'no-store' }).then((x) => x.json()).catch(() => null)
