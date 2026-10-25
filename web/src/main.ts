@@ -52,6 +52,8 @@ document.addEventListener('visibilitychange', checkUpdate)
 setInterval(checkUpdate, 10 * 60000)
 setTimeout(checkUpdate, 5000)
 
+// 主脚本已经跑起来了：index.html 的「没显示」检测据此知道只是在等接管（慢网络下最多 5 秒），不是脚本坏了
+;(window as any).__booted = true
 await leaseReady
 const app = mount(App, { target: document.getElementById('app')! })
 // 诊断：安全区和各种高度（iOS 主屏幕 App 的布局问题靠这个查）

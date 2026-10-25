@@ -37,9 +37,12 @@
       if (s) { var n = document.createElement('script'); n.type = 'module'; n.src = s.getAttribute('src') + '?b=' + t; document.body.appendChild(n) }
       report('retry', 'reloading main script with cache-bust')
     }
-    setTimeout(function () {
+    var waited = false
+    setTimeout(function check() {
       if (window.__mounted) return
-      report('stuck', 'not mounted after 6s; sw=' + !!(navigator.serviceWorker && navigator.serviceWorker.controller) + ' online=' + navigator.onLine)
+      // 主脚本已经在跑、只是在等接管（main.ts 设 __booted，接管最多等 5 秒）：再给 6 秒，不算卡住
+      if (window.__booted && !waited) { waited = true; return setTimeout(check, 6000) }
+      report('stuck', 'not mounted after ' + (waited ? '12' : '6') + 's; booted=' + !!window.__booted + ' sw=' + !!(navigator.serviceWorker && navigator.serviceWorker.controller) + ' online=' + navigator.onLine)
       retry()
       setTimeout(showRecovery, 8000)
     }, 6000)

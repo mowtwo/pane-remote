@@ -10,6 +10,9 @@ earlier work predates the public repository.
 
 ### Fixed
 - On a Mac without a monitor (screen sharing uses a virtual display) the screen view showed an empty display name. Displays without a name are now labelled with their number and resolution, e.g. "Display 1 · 1920×1080".
+- Opaque cross-origin `Script error.` reports (no file, line or stack; they come from browser extensions or injected scripts, not pane-remote) are no longer recorded as incidents.
+- On a slow network the page could be reported as stuck ("not mounted after 6s") while it was only waiting up to 5 seconds for the lease. The check now gives a page whose main script is already running another 6 seconds; it still waits for the lease before mounting, so streams never race the claim.
+- A WezTerm restart (its mux socket briefly gone) is treated as the Mac being offline instead of raising an incident.
 - `docs/relay.md`: new step 0 for the server — a regular service user, Node at `/usr/bin/node`, and the directories the systemd unit writes to created beforehand; without them the unit fails to start.
 
 ## [0.15.4] - 2026-10-25 — Switch accounts on restart
