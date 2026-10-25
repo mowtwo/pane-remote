@@ -27,7 +27,7 @@ export const getPrefs = () => prefs
 // 发现的问题（推送失败、扫描出错、事件到得太晚）交给服务端记成问题报告（incidents.mjs）
 let problem = () => {}
 // 电脑睡着 / 断网时 ssh 连不上：正常情况，不算问题
-const offline = (m) => /Connection refused|Connection timed out|connect to host|kex_exchange|Connection closed|Connection reset|timed out|Operation timed out|No route to host|Network is unreachable/i.test(String(m))
+const offline = (m) => /Connection refused|Connection timed out|connect to host|kex_exchange|Connection closed|Connection reset|timed out|Operation timed out|No route to host|Network is unreachable|failed to connect to Socket|connecting to .*wezterm.*sock/i.test(String(m))
 export function onProblem(fn) { problem = fn }
 /** 电脑键鼠最近一次空闲秒数（tails 扫描时更新）：人在电脑前就不推 */
 export const macIdle = () => lastIdle
