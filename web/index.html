@@ -26,7 +26,7 @@
     window.__report = report
     // 懒加载分块的预载（link rel=modulepreload）没取到：多半是断网的那一下，lib/lazy 等网络回来会重试，只记一笔，不当问题
     addEventListener('error', function (e) { var el = e.target; if (el && el.tagName === 'LINK' && el.rel === 'modulepreload') return report('lazy-net', el.href) }, true)
-    addEventListener('error', function (e) { if (e.target && e.target.tagName === 'LINK' && e.target.rel === 'modulepreload') return; report('error', (e.message || (e.target && (e.target.src || e.target.href)) || 'resource') + ' @ ' + (e.filename || '') + ':' + (e.lineno || '') + ' ' + (e.error && e.error.stack || '')) }, true)
+    addEventListener('error', function (e) { if (e.target && e.target.tagName === 'LINK' && e.target.rel === 'modulepreload') return; if (!e.filename && !e.lineno && !e.error && /^Script error\.?$/.test(e.message || '')) return; report('error', (e.message || (e.target && (e.target.src || e.target.href)) || 'resource') + ' @ ' + (e.filename || '') + ':' + (e.lineno || '') + ' ' + (e.error && e.error.stack || '')) }, true)
     addEventListener('unhandledrejection', function (e) { report('rejection', e.reason && (e.reason.stack || e.reason.message) || e.reason) })
     // 6 秒没显示：先带随机参数重新下载主脚本和样式（绕开浏览器里可能已经坏掉的缓存），再等 8 秒还不行才给按钮
     function retry() {

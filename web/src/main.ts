@@ -7,7 +7,9 @@ import { toast } from 'svelte-sonner'
 import { update } from '$lib/update.svelte'
 
 // 报错发回服务端，方便排查手机上的问题（pane-remote logs 里搜 client）
-addEventListener('error', (e) => report('error', `${e.message} @ ${e.filename}:${e.lineno}:${e.colno} ${e.error?.stack || ''}`))
+// 浏览器对跨域脚本（Safari 扩展 / 注入脚本等）的报错只给 "Script error."，没有文件、行号、堆栈：不是我们的代码，没法排查，不上报
+const opaque = (e: ErrorEvent) => !e.filename && !e.lineno && !e.error && /^Script error\.?$/.test(e.message)
+addEventListener('error', (e) => opaque(e) ? undefined : report('error', `${e.message} @ ${e.filename}:${e.lineno}:${e.colno} ${e.error?.stack || ''}`))
 addEventListener('unhandledrejection', (e) => (lease.status === 'kicked' || lease.status === 'local') ? undefined : report('rejection', e.reason?.stack || e.reason?.message || e.reason))
 const build = (document.querySelector('script[src*="assets/index-"]') as HTMLScriptElement | null)?.src.split('/').pop() || 'dev'
 declare const __BUILD_TIME__: string
