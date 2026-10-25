@@ -16,7 +16,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
-  <script type="module" crossorigin src="./assets/index-DFPhp7QF.js"></script>
+  <script type="module" crossorigin src="./assets/index-xMmjHmLB.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/c-i18n-CgCnPYlc.js">
   <link rel="modulepreload" crossorigin href="./assets/c-scroll-lock-bxKJJ3LU.js">
   <link rel="modulepreload" crossorigin href="./assets/c-utils-DOYKuNGp.js">
@@ -64,7 +64,7 @@
     window.__report = report
     // 懒加载分块的预载（link rel=modulepreload）没取到：多半是断网的那一下，lib/lazy 等网络回来会重试，只记一笔，不当问题
     addEventListener('error', function (e) { var el = e.target; if (el && el.tagName === 'LINK' && el.rel === 'modulepreload') return report('lazy-net', el.href) }, true)
-    addEventListener('error', function (e) { if (e.target && e.target.tagName === 'LINK' && e.target.rel === 'modulepreload') return; report('error', (e.message || (e.target && (e.target.src || e.target.href)) || 'resource') + ' @ ' + (e.filename || '') + ':' + (e.lineno || '') + ' ' + (e.error && e.error.stack || '')) }, true)
+    addEventListener('error', function (e) { if (e.target && e.target.tagName === 'LINK' && e.target.rel === 'modulepreload') return; if (!e.filename && !e.lineno && !e.error && /^Script error\.?$/.test(e.message || '')) return; report('error', (e.message || (e.target && (e.target.src || e.target.href)) || 'resource') + ' @ ' + (e.filename || '') + ':' + (e.lineno || '') + ' ' + (e.error && e.error.stack || '')) }, true)
     addEventListener('unhandledrejection', function (e) { report('rejection', e.reason && (e.reason.stack || e.reason.message) || e.reason) })
     // 6 秒没显示：先带随机参数重新下载主脚本和样式（绕开浏览器里可能已经坏掉的缓存），再等 8 秒还不行才给按钮
     function retry() {
@@ -75,9 +75,12 @@
       if (s) { var n = document.createElement('script'); n.type = 'module'; n.src = s.getAttribute('src') + '?b=' + t; document.body.appendChild(n) }
       report('retry', 'reloading main script with cache-bust')
     }
-    setTimeout(function () {
+    var waited = false
+    setTimeout(function check() {
       if (window.__mounted) return
-      report('stuck', 'not mounted after 6s; sw=' + !!(navigator.serviceWorker && navigator.serviceWorker.controller) + ' online=' + navigator.onLine)
+      // 主脚本已经在跑、只是在等接管（main.ts 设 __booted，接管最多等 5 秒）：再给 6 秒，不算卡住
+      if (window.__booted && !waited) { waited = true; return setTimeout(check, 6000) }
+      report('stuck', 'not mounted after ' + (waited ? '12' : '6') + 's; booted=' + !!window.__booted + ' sw=' + !!(navigator.serviceWorker && navigator.serviceWorker.controller) + ' online=' + navigator.onLine)
       retry()
       setTimeout(showRecovery, 8000)
     }, 6000)
