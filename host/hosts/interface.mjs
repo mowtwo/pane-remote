@@ -5,10 +5,11 @@
 
 /**
  * @typedef {object} Terminal 一个终端 pane（和服务端 /api/panes 返回的形状一致，服务端可以原样转给手机）
- * @property {number} pane       pane 编号（同一个终端服务器里唯一）
- * @property {number} tab
- * @property {number} window
+ * @property {number|string} pane       pane 编号（同一个终端服务器里唯一）
+ * @property {number|string} tab
+ * @property {number|string} window
  * @property {string} workspace  WezTerm workspace；测试用的是 pane-remote-test
+ * @property {{kind: string, name: string}|null} [terminalAgent] Herdr snapshot agent identity
  * @property {string} title
  * @property {string} tabTitle
  * @property {string} cwd        家目录缩写成 ~ 的路径（显示用）
@@ -41,9 +42,9 @@
  * @property {string} platform  'macos' | 'linux' …
  * @property {object} terminals
  * @property {() => Promise<Terminal[]>} terminals.list
- * @property {(pane: number, opts?: {lines?: number, escapes?: boolean}) => Promise<string>} terminals.text  画面文字（含最近若干行回滚）
+ * @property {(pane: number|string, opts?: {lines?: number, escapes?: boolean}) => Promise<string>} terminals.text  画面文字（含最近若干行回滚）
  * @property {object} agents
- * @property {(pane: number) => Promise<AgentSession>} agents.session
+ * @property {(pane: number|string) => Promise<AgentSession>} agents.session
  * @property {(s: AgentSession, n: number) => Promise<Message[]>} agents.messages  会话最近 n 条消息
  * @property {(s: AgentSession) => string[]} agents.watchFiles  会话记录变了要看哪些文件（fs.watch 用；SQLite 还要看 -wal）
  * @property {object} events

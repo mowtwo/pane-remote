@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isPaneId, terminalId } from '../lib/terminal-id.mjs'
 // pane-host：电脑上的常驻服务（pane-remote init 装成 LaunchAgent，见 docs/host.md；不在时 connect.mjs 会就地拉起一个）。
 // 监听 ~/.cache/pane-remote-host/host.sock（目录 0700、socket 0600），每个连接说 protocol.mjs 里的协议。
 // 服务端经 bridge 的 `host` 指令（ssh → connect.mjs → 这里）只占一条长连接，代替每次 `ssh … agent/bridge <命令>`。
@@ -51,9 +52,9 @@ async function openFeed(topic) {
     feed = toolsFeed
     ready = Promise.resolve()
   } else {
-    const m = /^transcript:(\d{1,6}):(\d{1,3})$/.exec(topic)
+    const m = /^transcript:(\d{1,6}|w[0-9A-HJKMNP-TV-Z]{1,13}:p[0-9A-HJKMNP-TV-Z]{1,13}):(\d{1,3})$/.exec(topic)
     if (!m) throw Object.assign(new Error(`unknown topic ${topic}`), { code: ERR.PARAMS })
-    feed = new TranscriptFeed(host, Number(m[1]), Math.min(200, Number(m[2]) || 60))
+    feed = new TranscriptFeed(host, terminalId(m[1]), Math.min(200, Number(m[2]) || 60))
     ready = feed.start()
   }
   f = { feed, refs: 1, closeTimer: null, ready }
@@ -141,8 +142,8 @@ const streams = {
   ...ai.streams,
 }
 function paneId(p) {
-  if (!/^\d{1,6}$/.test(String(p))) throw Object.assign(new Error('bad pane id'), { code: ERR.PARAMS })
-  return Number(p)
+  if (!isPaneId(p)) throw Object.assign(new Error('bad pane id'), { code: ERR.PARAMS })
+  return terminalId(p)
 }
 const sleep = (ms, signal) => new Promise((r) => { const t = setTimeout(r, ms); signal?.addEventListener('abort', () => { clearTimeout(t); r() }, { once: true }) })
 

@@ -62,6 +62,17 @@ test('调用：第一次在手机上问 mcp 权限，始终允许后不再问；
   assert.ok(pf._audit.list('todo').some((x) => x.method === 'mcp.add' && x.result === 'ok'))
 })
 
+test('Herdr caller identity survives permission prompts, runtime and stored plugin data', async () => {
+  const { pf } = makePlatform()
+  const nativeCaller = { ...caller, pane: 'wA:pB' }
+  const pending = pf.agentTools.call({ name: 'plugin_todo_add', args: { title: 'Native pane task' }, caller: nativeCaller })
+  assert.match((await answerNextAsk(pf, '始终允许')).question, /#wA:pB/)
+  assert.equal((await pending).value.added.source.pane, 'wA:pB')
+  const invalid = await pf.agentTools.call({ name: 'plugin_todo_add', args: { title: 'Invalid pane task' }, caller: { ...caller, pane: 'wA:pB;bad' } })
+  assert.equal(invalid.value.added.source.pane, null)
+  pf.flush()
+})
+
 test('权限：禁止后这个插件的工具从列表里消失，调用被拒', async () => {
   const { pf } = makePlatform()
   const p = pf.agentTools.call({ name: 'plugin_todo_list', args: {}, caller })

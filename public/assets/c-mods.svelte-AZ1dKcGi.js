@@ -1,1 +1,0 @@
-import{ft as e}from"./c-i18n-FrSBeU9o.js";var t=e({shift:!1,alt:!1}),n=/^\x1b\[([ABCD])$/;function r(e){let{shift:r,alt:i}=t;if(!r&&!i)return e;t.shift=t.alt=!1;let a=e.match(n);return a?`\x1b[1;${1+ +!!r+(i?2:0)}${a[1]}`:r&&e===`\r`?`\x1B\r`:r&&e===`	`?`\x1B[Z`:i?`\x1b${e}`:e}function i(){let e=(t.shift?4:0)+(t.alt?8:0);return t.shift=t.alt=!1,e}export{i as n,r,t};

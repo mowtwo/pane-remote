@@ -20,7 +20,7 @@ case "$(basename "$cmd")" in
     # skill 用 developer_instructions 让它自己去读
     exec "$cmd" "$@" \
       -c "mcp_servers.pane-remote.command=\"$P/bin/mcp\"" \
-      -c 'mcp_servers.pane-remote.env_vars=["WEZTERM_PANE","PANE_REMOTE_INCIDENT"]' \
+      -c 'mcp_servers.pane-remote.env_vars=["WEZTERM_PANE","HERDR_PANE_ID","HERDR_SOCKET_PATH","PANE_REMOTE_BRIDGE_ENV","PANE_REMOTE_CONFIG","PANE_REMOTE_INCIDENT"]' \
       -c 'mcp_servers.pane-remote.env={PANE_REMOTE_AGENT="codex"}' \
       -c 'mcp_servers.pane-remote.tool_timeout_sec=1900' \
       -c 'mcp_servers.pane-remote.default_tools_approval_mode="approve"' \

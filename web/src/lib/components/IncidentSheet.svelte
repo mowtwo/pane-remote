@@ -85,7 +85,7 @@
     try { await setFixer(patch) } catch (e) { toast.error(tr((e as Error).message)) }
   }
   const chip = (on: boolean) => cn('h-8 rounded-lg border px-3 text-[13px]', on ? 'border-primary bg-primary/10 font-medium text-primary' : 'bg-card')
-  const goPane = (p?: number) => { if (p == null) return; open = false; select(String(p)) }
+  const goPane = (p?: number | string) => { if (p == null) return; open = false; select(String(p)) }
 </script>
 
 <Drawer.Root bind:open>

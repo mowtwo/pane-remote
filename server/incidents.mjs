@@ -16,6 +16,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { isPaneId, terminalId } from '../lib/terminal-id.mjs'
 
 const MAX = 300 // 最多留这么多条（先删已解决的、最老的）
 const SAMPLES = 5
@@ -248,7 +249,7 @@ async function triageOrder() {
 
 // ---------- 来自电脑端（events.jsonl kind=incident）----------
 export function onMacEvent(ev) {
-  const reporter = { agent: ev.agent || '', pane: Number.isInteger(ev.pane) ? ev.pane : null, session: ev.session || '', configDir: ev.configDir || '' }
+  const reporter = { agent: ev.agent || '', pane: isPaneId(ev.pane) ? terminalId(ev.pane) : null, session: ev.session || '', configDir: ev.configDir || '' }
   if (ev.op === 'update') return onUpdate(ev)
   if (ev.op !== 'report') return
   const isAgent = ev.source === 'agent'
@@ -275,7 +276,7 @@ function onUpdate(ev) {
   if (typeof ev.branch === 'string' && /^[\w./-]{1,100}$/.test(ev.branch)) u.branch = ev.branch
   if (typeof ev.pr === 'string' && /^https:\/\/\S{1,300}$/.test(ev.pr)) u.pr = ev.pr
   note(inc, u)
-  if (Number.isInteger(ev.pane) && !inc.fix.pane) inc.fix.pane = ev.pane
+  if (isPaneId(ev.pane) && inc.fix.pane == null) inc.fix.pane = terminalId(ev.pane)
   if (ev.status === 'fixed') { inc.status = 'fixed'; inc.fix.state = 'done'; inc.fixedAt = now() }
   else if (ev.status === 'wontfix') { inc.status = 'ignored'; inc.fix.state = 'done' }
   else if (ev.status === 'failed') { inc.status = 'open'; inc.fix.state = 'failed' }

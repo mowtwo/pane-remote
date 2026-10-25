@@ -1,7 +1,7 @@
 // 问题报告（服务端 incidents.mjs）：顶栏的数字每 30 秒拉一次；打开面板时拉完整列表
 import { postJson } from './api'
 
-export type IncidentFix = { mode?: 'bound' | 'new'; state?: 'queued' | 'running' | 'done' | 'failed' | 'cancelled'; pane?: number; agent?: string; last?: FixUpdate }
+export type IncidentFix = { mode?: 'bound' | 'new'; state?: 'queued' | 'running' | 'done' | 'failed' | 'cancelled'; pane?: number | string; agent?: string; last?: FixUpdate }
 export type FixUpdate = { t: number; status: string; note?: string; branch?: string; pr?: string }
 export type IncidentSummary = {
   id: string; title: string; source: 'server' | 'phone' | 'mac' | 'agent' | 'user' | 'plugin'; component: string; kind: string; severity: 'high' | 'normal' | 'low'
@@ -10,7 +10,7 @@ export type IncidentSummary = {
 }
 export type Incident = Omit<IncidentSummary, 'fix'> & {
   samples: { t: number; msg: string; detail?: string; ctx?: Record<string, unknown> }[]
-  reporter?: { agent?: string; pane?: number } | null
+  reporter?: { agent?: string; pane?: number | string } | null
   regressed?: number
   ai?: { summary?: string; cause?: string; severity?: string; duplicateOf?: string; agent?: string; model?: string; ms?: number; error?: string; skipped?: string } | null
   fix: (IncidentFix & { updates?: FixUpdate[]; started?: number; session?: string }) | null

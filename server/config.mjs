@@ -14,6 +14,7 @@ export const CONFIG_PATH = process.env.PANE_REMOTE_CONFIG || path.join(os.homedi
 
 const DEFAULTS = {
   mode: 'local',
+  terminalBackend: 'wezterm', // init writes the selected backend to bridge.env (also used in relay mode)
   port: 8787,
   // 允许访问的 Tailscale 登录名（tailscale serve 注入的 Tailscale-User-Login）。空 = 谁都不让进
   allowedLogins: [],

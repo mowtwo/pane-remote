@@ -8,7 +8,7 @@
   import History from '@lucide/svelte/icons/history'
   import Check from '@lucide/svelte/icons/check'
   import { Button } from '$lib/components/ui/button'
-  import { manage, fetchSessions, type CreateTarget, type ClaudeSession } from '$lib/api'
+  import { manage, fetchSessions, workspaceLabel, label, type CreateTarget, type ClaudeSession } from '$lib/api'
   import { prefs } from '$lib/prefs.svelte'
   import { ui, loadPanes, select } from '$lib/session.svelte'
   import { cn } from '$lib/utils'
@@ -126,10 +126,10 @@
     body.inject = prefs.inject
     let action: 'spawn' | 'split' = 'spawn'
     if (where === 'split' && target.split) { action = 'split'; body.pane = target.split.pane; body.direction = target.direction }
-    else body.window = where === 'new' ? 'new' : Number(where.slice(1))
+    else body.window = where === 'new' ? 'new' : where.slice(1)
     busy = true
     try {
-      const { pane } = await manage<{ pane: number }>(action, body)
+      const { pane } = await manage<{ pane: number | string }>(action, body)
       if (!resume) prefs.lastCmd = command
       open = false
       ondone()
@@ -148,9 +148,10 @@
   }
 
   const chip = (on: boolean) => cn('h-9 rounded-full border px-3.5 text-sm', on ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-foreground active:bg-accent')
+  const herdr = $derived(ui.panes.some((p) => p.backend === 'herdr'))
   const places = $derived(target.split
-    ? [{ v: 'split', label: t(target.direction === 'right' ? '拆分 #{pane}（右侧）' : '拆分 #{pane}（下方）', { pane: target.split.pane }) }]
-    : [...windows.map((w) => ({ v: `w${w}`, label: t('窗口 {w} 新标签', { w }) })), { v: 'new', label: t('新窗口') }])
+    ? [{ v: 'split', label: t(target.direction === 'right' ? '拆分「{name}」（右侧）' : '拆分「{name}」（下方）', { name: label(target.split) }) }]
+    : [...windows.map((w, i) => ({ v: `w${w}`, label: t('{name} · 新标签页', { name: workspaceLabel(ui.panes.find((p) => p.window === w)!, i) }) })), { v: 'new', label: t(herdr ? '新工作区' : '新窗口') }])
 </script>
 
 {#if open}

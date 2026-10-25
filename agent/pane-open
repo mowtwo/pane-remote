@@ -32,7 +32,11 @@ esac
 if [[ -n "$url" ]] && phone_active; then
   log=$HOME/.local/state/pane-remote/events.jsonl
   mkdir -p "$(dirname "$log")"
-  /usr/bin/python3 -c 'import json,sys,time,os; print(json.dumps({"t": time.time(), "pane": int(os.environ.get("WEZTERM_PANE") or 0) if (os.environ.get("WEZTERM_PANE") or "0").isdigit() else 0, "kind": "open", "msg": sys.argv[1]}, ensure_ascii=False))' "$url" >> "$log"
+  /usr/bin/python3 -c 'import json,sys,time,os
+sys.path.insert(0, os.path.dirname(os.path.realpath(sys.argv[1])))
+from herdr_backend import current_pane, pane_value
+pane = current_pane()
+print(json.dumps({"t": time.time(), "pane": pane_value(pane) if pane else None, "kind": "open", "msg": sys.argv[2]}, ensure_ascii=False))' "${BASH_SOURCE[0]}" "$url" >> "$log"
   echo "已转到手机的预览面板打开：$url" >&2
   exit 0
 fi

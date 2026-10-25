@@ -2,7 +2,8 @@
 # MCP 服务启动脚本：用 pane-remote init 记下的 node（~/.config/pane-remote/bridge.env 里的 NODE），
 # 没有再找 PATH 里的。PANE_REMOTE_AGENT 由各家配置传进来
 NODE=""
-ENV_FILE=${PANE_REMOTE_BRIDGE_ENV:-$HOME/.config/pane-remote/bridge.env}
+CONFIG_FILE=${PANE_REMOTE_CONFIG:-$HOME/.config/pane-remote/config.json}
+ENV_FILE=${PANE_REMOTE_BRIDGE_ENV:-$(dirname "$CONFIG_FILE")/bridge.env}
 [ -f "$ENV_FILE" ] && NODE=$(sed -n 's/^NODE=//p' "$ENV_FILE" | head -1)
 [ -x "$NODE" ] || NODE=$(command -v node)
 [ -x "$NODE" ] || for n in /opt/homebrew/bin/node /usr/local/bin/node; do [ -x "$n" ] && NODE=$n && break; done

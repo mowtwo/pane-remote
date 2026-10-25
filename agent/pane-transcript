@@ -10,6 +10,7 @@
 只读最后约 2MB；子代理（sidechain）、系统提示、思考过程不显示。
 """
 import glob, json, os, re, subprocess, sys, time
+from herdr_backend import Herdr, enabled, valid_pane
 
 PANES = os.path.expanduser("~/.local/state/pane-remote/panes.json")
 TAILS = (2 << 20, 8 << 20, 32 << 20)  # 不够条数就往前多读（截图之类的工具结果一行就有好几 MB）
@@ -21,6 +22,12 @@ WEZTERM = "/Applications/WezTerm.app/Contents/MacOS/wezterm"
 
 def fg_procs(pane):
     """pane 前台进程组里的所有进程：[(pid, args)]"""
+    if enabled():
+        h = Herdr()
+        info = h.processes(str(pane))
+        p = h.call("pane.get", pane_id=str(pane))["pane"]
+        procs = [(str(x["pid"]), x.get("cmdline") or " ".join(x.get("argv") or []) or x["name"]) for x in info.get("foreground_processes", [])]
+        return procs, p.get("foreground_cwd") or p.get("cwd") or ""
     panes = json.loads(subprocess.run([WEZTERM, "cli", "--no-auto-start", "list", "--format", "json"], capture_output=True, text=True, timeout=5).stdout)
     p = next(p for p in panes if str(p["pane_id"]) == str(pane))
     tty = p["tty_name"].replace("/dev/", "")
@@ -196,7 +203,7 @@ def live_claude():
         return {}
     ps = subprocess.run(["/bin/ps", "-o", "pid=,tty=,comm=", "-p", ",".join(map(str, pids))], capture_output=True, text=True).stdout
     try:
-        panes = json.loads(subprocess.run([WEZTERM, "cli", "--no-auto-start", "list", "--format", "json"], capture_output=True, text=True, timeout=5).stdout)
+        panes = Herdr().list() if enabled() else json.loads(subprocess.run([WEZTERM, "cli", "--no-auto-start", "list", "--format", "json"], capture_output=True, text=True, timeout=5).stdout)
         ttys = {p["tty_name"].replace("/dev/", ""): p["pane_id"] for p in panes if p.get("tty_name")}
     except Exception:
         ttys = {}
@@ -784,7 +791,7 @@ if __name__ == "__main__":
         n = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].isdigit() else 60
         print(json.dumps(messages_of({"agent": pane, "transcript": path}, min(n, 200)), ensure_ascii=False))
         sys.exit(0)
-    if not pane.isdigit():
+    if not valid_pane(pane):
         sys.exit("bad pane")
     if cmd == "session":
         print(json.dumps(session(pane), ensure_ascii=False))

@@ -71,7 +71,7 @@
     if (!info || !sel || saving || busy || info.readOnly) return
     saving = true; err = ''
     try {
-      const r = await postJson<{ current: { model: string; effort: string } }>('api/agent/model', { ...(cursor ? { cursor } : { pane: Number(pane) }), model: sel.id, effort: sel.efforts.length ? effort : '' })
+      const r = await postJson<{ current: { model: string; effort: string } }>('api/agent/model', { ...(cursor ? { cursor } : { pane: pane }), model: sel.id, effort: sel.efforts.length ? effort : '' })
       toast(t('已切换到 {m}', { m: short(sel.label) + (r.current?.effort ? ` · ${effortName(r.current.effort)}` : '') }))
       open = false
       load()
