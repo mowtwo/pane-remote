@@ -1,0 +1,1 @@
+import{c as e,l as t}from"./c-i18n-CgCnPYlc.js";import{t as n}from"./c-Icon-XrIUZ3AT.js";var r=new Set([`$$slots`,`$$events`,`$$legacy`]);function i(i,a){let o=e(a,r),s={name:`rotate-cw`,size:24,node:[[`path`,{d:`M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8`}],[`path`,{d:`M21 3v5h-5`}]]};n(i,t(()=>o,{get icon(){return s}}))}export{i as t};
