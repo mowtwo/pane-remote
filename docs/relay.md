@@ -21,7 +21,28 @@
 
 ## 步骤
 
-下面「电脑」= 装 WezTerm 的 Mac，「服务器」= 你的 Linux 云服务器（已经装好 Tailscale、Node.js 20+，并打开了 HTTPS Certificates）。
+下面「电脑」= 装 WezTerm 的 Mac，「服务器」= 你的 Linux 云服务器（已经装好 Tailscale，并在 Tailscale 后台打开了 HTTPS Certificates；Node 和运行用户见第 0 步）。
+
+### 0. 服务器：准备用户、Node 和目录
+
+服务要以一个普通用户运行，不要用 root：`pane-remote relay systemd` 生成的服务文件按 `/home/<用户>` 写路径，并且开了 `ProtectSystem=strict`。下面以用户名 `pane` 为例，用 root 执行：
+
+```bash
+# Node 要在 /usr/bin/node（服务文件的 ExecStart 按这个路径写；装在别处就改 ExecStart）
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs rsync
+
+U=pane   # 服务用户名
+adduser --disabled-password --gecos "" "$U"
+# 服务文件里 ReadWritePaths 列的目录必须事先存在，否则服务起不来
+mkdir -p /home/${U}/.ssh /home/${U}/.config/pane-remote /home/${U}/.local/share/pane-remote
+cp ~/.ssh/authorized_keys /home/${U}/.ssh/   # 让你用同一把密钥登录这个用户
+chown -R "$U:$U" /home/${U} && chmod 700 /home/${U}/.ssh
+# 可选：隧道卡住时自动恢复要用（见下面「隧道卡住时」），只放行这一条命令
+echo "$U ALL=(root) NOPASSWD: /usr/bin/ss" > /etc/sudoers.d/pane-ss && chmod 440 /etc/sudoers.d/pane-ss
+```
+
+下面步骤里的 `<用户>@<服务器>` 都用这个用户（例子里是 `pane@<服务器>`）。
 
 ### 1. 电脑：基础安装，但不发布
 
@@ -87,7 +108,7 @@ ssh-keyscan -p 2222 127.0.0.1 >> ~/.ssh/known_hosts   # 反向隧道建好之后
 pane-remote relay server-config --mac-user <电脑上的用户名> --login <你的 Tailscale 登录名>
 ```
 
-systemd 服务文件（`/etc/systemd/system/pane-remote.service`，把里面的用户名换成你的）：
+systemd 服务文件（`/etc/systemd/system/pane-remote.service`，把里面的 `<服务器用户名>` 换成第 0 步建的用户；`node -v` 能跑但不在 `/usr/bin/node` 时，用 `command -v node` 的结果改 ExecStart）：
 
 ```bash
 pane-remote relay systemd

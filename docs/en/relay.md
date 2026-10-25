@@ -21,7 +21,28 @@ Before using it, make sure your organization's network and security policies all
 
 ## Steps
 
-Below, "Mac" is the Mac with WezTerm and "server" is your Linux cloud server (with Tailscale, Node.js 20+ and HTTPS Certificates already set up).
+Below, "Mac" is the Mac with WezTerm and "server" is your Linux cloud server (with Tailscale installed and HTTPS Certificates enabled in the Tailscale admin console; Node and the service user are covered in step 0).
+
+### 0. Server: user, Node and directories
+
+Run the service as a regular user, not root: the unit printed by `pane-remote relay systemd` uses `/home/<user>` paths and sets `ProtectSystem=strict`. With the user name `pane` as an example, as root:
+
+```bash
+# Node must be at /usr/bin/node (the unit's ExecStart uses that path; change ExecStart if yours is elsewhere)
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs rsync
+
+U=pane   # service user name
+adduser --disabled-password --gecos "" "$U"
+# The directories listed in the unit's ReadWritePaths must exist beforehand, or the service fails to start
+mkdir -p /home/${U}/.ssh /home/${U}/.config/pane-remote /home/${U}/.local/share/pane-remote
+cp ~/.ssh/authorized_keys /home/${U}/.ssh/   # log in as this user with the same key
+chown -R "$U:$U" /home/${U} && chmod 700 /home/${U}/.ssh
+# Optional: needed for tunnel self-healing (see "When the tunnel gets stuck"); allows only this one command
+echo "$U ALL=(root) NOPASSWD: /usr/bin/ss" > /etc/sudoers.d/pane-ss && chmod 440 /etc/sudoers.d/pane-ss
+```
+
+Use this user for every `<user>@<server>` below (`pane@<server>` in the example).
 
 ### 1. Mac: basic install without publishing
 
@@ -87,7 +108,7 @@ Generate the server's config `~/.config/pane-remote/config.json` on the Mac and 
 pane-remote relay server-config --mac-user <your Mac user name> --login <your Tailscale login>
 ```
 
-The systemd unit (`/etc/systemd/system/pane-remote.service`; replace the user names in it with yours):
+The systemd unit (`/etc/systemd/system/pane-remote.service`; replace `<server-user>` with the user from step 0, and if Node is not at `/usr/bin/node`, put the output of `command -v node` in ExecStart):
 
 ```bash
 pane-remote relay systemd
